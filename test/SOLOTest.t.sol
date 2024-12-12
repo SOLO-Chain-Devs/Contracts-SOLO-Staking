@@ -136,8 +136,8 @@ contract SOLOTest is Test {
 
     // Fuzz tests
     function testFuzz_StakeUnstake(uint256 amount) public {
-        // Bound the amount to something reasonable and non-zero
-        amount = bound(amount, 1, 1000000e18);
+        // Bound the amount to alice's balance (10000e18)
+        amount = bound(amount, 1, 10000e18);
         
         vm.startPrank(alice);
         solo.approve(address(sSolo), amount);
@@ -151,8 +151,8 @@ contract SOLOTest is Test {
     }
 
     function testFuzz_StakeRestakeUnstake(uint256 amount) public {
-        // Bound the amount to something reasonable and non-zero
-        amount = bound(amount, 1, 1000000e18);
+        // Bound the amount to alice's balance (10000e18)
+        amount = bound(amount, 1, 10000e18);
         
         vm.startPrank(alice);
         
@@ -178,7 +178,11 @@ contract SOLOTest is Test {
         vm.startPrank(alice);
         
         for(uint i = 0; i < amounts.length; i++) {
-            uint256 amount = bound(amounts[i], 1, 1000000e18);
+            // Ensure total amount doesn't exceed alice's balance
+            uint256 remainingBalance = 10000e18 - totalAmount;
+            if (remainingBalance == 0) break;
+            
+            uint256 amount = bound(amounts[i], 1, remainingBalance);
             totalAmount += amount;
             
             solo.approve(address(sSolo), amount);
