@@ -18,7 +18,7 @@ contract StakedSOLOManual is ERC20, Ownable, ReentrancyGuard {
     uint256 private _totalShares;
     uint256 private _shareRate = 1e18; // Initial rate 1:1
     
-    constructor(address _soloToken) ERC20("Staked SOLO", "stSOLO") {
+    constructor(address _soloToken, address initialOwner) ERC20("StakedSOLOR1", "stSOLOR1") Ownable(initialOwner){
         soloToken = SOLO(_soloToken);
         lastRebaseTime = block.timestamp;
         rewardPerSecond = REWARD_RATE / SECONDS_PER_YEAR;
@@ -45,8 +45,8 @@ contract StakedSOLOManual is ERC20, Ownable, ReentrancyGuard {
         soloToken.transfer(msg.sender, amount);
     }
     
-    function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual override {
-        super._beforeTokenTransfer(from, to, amount);
+    function _update(address from, address to, uint256 amount) internal override {
+        super._update(from, to, amount);
         if (from != address(0) && to != address(0)) {
             uint256 shares = (amount * 1e18) / _shareRate;
             _shares[from] -= shares;
