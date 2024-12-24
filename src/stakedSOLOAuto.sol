@@ -19,7 +19,7 @@ contract stakedSOLOAuto is ERC20, Ownable, ReentrancyGuard {
  
     mapping(address => bool) public whitelistedAddresses;
     
-    constructor(address _soloToken) ERC20("Staked SOLO", "stSOLO") {
+    constructor(address _soloToken, address initialOwner) ERC20("Staked SOLOR2", "stSOLOR2") Ownable(initialOwner){
         soloToken = SOLO(_soloToken);
         lastRebaseTime = block.timestamp;
         rewardPerSecond = REWARD_RATE / SECONDS_PER_YEAR;
@@ -34,17 +34,15 @@ contract stakedSOLOAuto is ERC20, Ownable, ReentrancyGuard {
         return timeElapsed * rewardPerSecond;
     }
     
-    function _transfer(
+    function _update(
         address from,
         address to,
         uint256 amount
     ) internal virtual override {
-        require(from != address(0), "Transfer from zero");
-        require(to != address(0), "Transfer to zero");
         
         // Skip rebase for whitelisted addresses
         if (whitelistedAddresses[from] || whitelistedAddresses[to]) {
-            super._transfer(from, to, amount);
+            super._update(from, to, amount);
             return;
         }
         
@@ -56,7 +54,7 @@ contract stakedSOLOAuto is ERC20, Ownable, ReentrancyGuard {
             lastRebaseTime = block.timestamp;
         }
         
-        super._transfer(from, to, amount);
+        super._update(from, to, amount);
     }
 
     function stake(uint256 amount) external nonReentrant {
@@ -83,5 +81,5 @@ contract stakedSOLOAuto is ERC20, Ownable, ReentrancyGuard {
     function shareOf(address account) public view returns (uint256) {
         return (_shares[account] * _shareRate) / 1e18;
     }
-    
 }
+
