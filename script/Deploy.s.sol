@@ -3,8 +3,6 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
 import "../src/mock/SOLO.sol";
-import "../src/stakedSOLO.sol";
-import "../src/restakedSOLO.sol";
 
 contract DeployScript is Script {
     function run() external {
@@ -16,13 +14,6 @@ contract DeployScript is Script {
         SOLO solo = new SOLO(initialSupply);
         console.log("SOLO deployed to:", address(solo));
 
-        // Deploy StakedSOLO
-        StakedSOLO sSolo = new StakedSOLO(address(solo));
-        console.log("StakedSOLO deployed to:", address(sSolo));
-
-        // Deploy RestakedSOLO
-        RestakedSOLO rsSolo = new RestakedSOLO(address(sSolo));
-        console.log("RestakedSOLO deployed to:", address(rsSolo));
 
         vm.stopBroadcast();
 
@@ -30,7 +21,5 @@ contract DeployScript is Script {
         console.log("\nDeployment Summary:");
         console.log("-------------------");
         console.log("SOLO:", address(solo));
-        console.log("StakedSOLO:", address(sSolo));
-        console.log("RestakedSOLO:", address(rsSolo));
     }
 }
