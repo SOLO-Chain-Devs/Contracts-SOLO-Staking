@@ -55,6 +55,10 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     constructor(uint256 _initialRewardRate) ERC20("Staked SOLO", "stSOLO") Ownable(msg.sender) {
             rewardRate = _initialRewardRate;
             lastRebaseTime = block.timestamp;
+        // Initialize with minimal amount to establish share ratio
+        _mint(msg.sender, 1);
+        _shares[msg.sender] = 1;
+        _totalShares = 1;
         }
 
     /**
