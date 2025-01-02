@@ -12,7 +12,7 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
     StSOLOToken public stSOLOToken;
     
     uint256 public withdrawalDelay;
-    uint256 public constant MIN_WITHDRAWAL_DELAY = 1 days;
+    uint256 public constant MIN_WITHDRAWAL_DELAY = 0 days;
     uint256 public constant MAX_WITHDRAWAL_DELAY = 30 days;
 
     struct WithdrawalRequest {
@@ -25,7 +25,7 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
     mapping(address => WithdrawalRequest[]) public withdrawalRequests;
 
     // Events
-    event Staked(address indexed user, uint256 amount);
+    event Staked(address indexed staker, address indexed recipient, uint256 amount);
     event WithdrawalRequested(address indexed user, uint256 stSOLOAmount, uint256 soloAmount, uint256 requestId);
     event WithdrawalProcessed(address indexed user, uint256 soloAmount, uint256 requestId);
     event WithdrawalDelayUpdated(uint256 oldDelay, uint256 newDelay);
@@ -55,18 +55,22 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
         withdrawalDelay = _newDelay;
     }
 
-    // Core staking functionality
-    function stake(uint256 _amount) external nonReentrant {
+    function stake(uint256 _amount, address _recipient) external nonReentrant {
         require(_amount > 0, "Cannot stake 0");
+        require(_recipient != address(0), "Invalid recipient");
+        // Prevent staking directly to the staking contract
+        require(_recipient != address(this), "Cannot stake to contract");
         
+        // Transfer SOLO tokens from the staker
         require(soloToken.transferFrom(msg.sender, address(this), _amount),
                 "SOLO transfer failed");
 
-        // Mint stSOLO tokens to the user
-        stSOLOToken.mint(msg.sender, _amount);
+        // Mint stSOLO tokens to the specified recipient
+        stSOLOToken.mint(_recipient, _amount);
         
-        emit Staked(msg.sender, _amount);
+        emit Staked(msg.sender, _recipient, _amount);
     }
+
 
     function requestWithdrawal(uint256 stSOLOAmount) external nonReentrant {
         require(stSOLOAmount > 0, "Cannot withdraw 0");
@@ -88,6 +92,7 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
         }));
 
         // Transfer and burn stSOLO tokens immediately
+        // TODO not sure if there is a use to keep SOLO in supply and only burn later
         require(stSOLOToken.transferFrom(msg.sender, address(this), stSOLOAmount),
                 "stSOLO transfer failed");
         stSOLOToken.burn(address(this), stSOLOAmount);
