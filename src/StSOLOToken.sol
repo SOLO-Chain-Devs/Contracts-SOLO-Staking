@@ -1,3 +1,10 @@
+/**
+ * @title StSOLO Token Contract
+ * @author Original contract enhanced with NatSpec
+ * @notice This contract implements a staking token that supports rebasing and exclusions
+ * @dev Implements ERC20 with additional share-based accounting for rebasing functionality
+ */
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
@@ -5,6 +12,12 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+/**
+ * @title StSOLOToken
+ * @notice A staked token contract that implements rebasing functionality with exclusion support
+ * @dev Inherits from ERC20, Ownable, and ReentrancyGuard for core functionality
+ *      Uses share-based accounting to handle rebasing correctly
+ */
 contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     // Share accounting
     mapping(address => uint256) private _shares;
@@ -20,6 +33,10 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     uint256 public constant SECONDS_PER_YEAR = 31536000;
     address public stakingContract;
 
+    /**
+     * @notice Ensures only the staking contract can call the function
+     * @dev Modifier to restrict certain functions to the staking contract
+     */
     modifier onlyStakingContract() {
         require(msg.sender == stakingContract, "Caller is not the staking contract");
         _;
@@ -30,17 +47,32 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     event RewardRateUpdated(uint256 oldRate, uint256 newRate);
     event AddressExcluded(address indexed account, bool excluded);
 
+    /**
+     * @notice Contract constructor
+     * @dev Initializes the contract with an initial reward rate
+     * @param _initialRewardRate Initial annual reward rate in basis points
+     */
     constructor(uint256 _initialRewardRate) ERC20("Staked SOLO", "stSOLO") Ownable(msg.sender) {
             rewardRate = _initialRewardRate;
             lastRebaseTime = block.timestamp;
         }
 
+    /**
+     * @notice Sets the staking contract address
+     * @dev Can only be called by the owner
+     * @param _stakingContract Address of the staking contract
+     */
     function setStakingContract(address _stakingContract) external onlyOwner {
         require(_stakingContract != address(0), "Invalid staking contract address");
         stakingContract = _stakingContract;
     }
 
-    // Exclusion management
+    /**
+     * @notice Manages exclusion status for an address
+     * @dev Updates exclusion mappings and arrays
+     * @param account Address to update exclusion status for
+     * @param excluded New exclusion status
+     */
     function setExcluded(address account, bool excluded) external onlyOwner {
         require(account != address(0), "Invalid address");
         
@@ -55,6 +87,11 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         emit AddressExcluded(account, excluded);
     }
 
+    /**
+     * @notice Removes an address from the excluded addresses array
+     * @dev Internal function to maintain excluded addresses list
+     * @param account Address to remove from excluded list
+     */
     function _removeFromExcludedAddresses(address account) internal {
         for (uint256 i = 0; i < excludedAddresses.length; i++) {
             if (excludedAddresses[i] == account) {
@@ -65,10 +102,18 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         }
     }
 
+    /**
+     * @notice Returns list of all excluded addresses
+     * @return Array of addresses excluded from rebasing
+     */
     function getExcludedAddresses() external view returns (address[] memory) {
         return excludedAddresses;
     }
 
+    /**
+     * @notice Calculates total token amount excluded from rebasing
+     * @return Total amount of tokens excluded from rebasing
+     */
     function calculateExcludedAmount() public view returns (uint256) {
         uint256 totalExcluded = 0;
         for (uint256 i = 0; i < excludedAddresses.length; i++) {
@@ -77,26 +122,48 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         return totalExcluded;
     }
 
-    // Share-based accounting
+    /**
+     * @notice Returns the share balance of an account
+     * @param account Address to check shares for
+     * @return Number of shares owned by the account
+     */
     function shareOf(address account) public view returns (uint256) {
         return _shares[account];
     }
 
+    /**
+     * @notice Returns the total number of shares
+     * @return Total number of shares in existence
+     */
     function totalShares() public view returns (uint256) {
         return _totalShares;
     }
 
+    /**
+     * @notice Converts shares to token amount
+     * @param share Number of shares to convert
+     * @return Equivalent token amount
+     */
     function _shareToAmount(uint256 share) internal view returns (uint256) {
         if (_totalShares == 0) return share;
         return (share * totalSupply()) / _totalShares;
     }
 
+    /**
+     * @notice Converts token amount to shares
+     * @param amount Token amount to convert
+     * @return Equivalent number of shares
+     */
     function _amountToShare(uint256 amount) internal view returns (uint256) {
         if (_totalShares == 0) return amount;
         return (amount * _totalShares) / totalSupply();
     }
 
-    // Core rebase functionality
+    /**
+     * @notice Performs rebase operation
+     * @dev Distributes rewards to non-excluded token holders
+     * @return Amount of tokens minted in the rebase
+     */
     function rebase() external returns (uint256) {
         require(block.timestamp >= lastRebaseTime + 1 days, "Too soon to rebase");
         
@@ -123,7 +190,13 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         return rebaseAmount;
     }
 
-    // Transfer and balance management
+    /**
+     * @notice Updates token balances and shares during transfers
+     * @dev Override of ERC20 _update to handle share accounting
+     * @param from Address tokens are transferred from
+     * @param to Address tokens are transferred to
+     * @param amount Amount of tokens transferred
+     */
     function _update(
         address from,
         address to,
@@ -151,6 +224,12 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         super._update(from, to, amount);
     }
 
+    /**
+     * @notice Mints new tokens
+     * @dev Can only be called by staking contract
+     * @param account Address to mint tokens to
+     * @param amount Amount of tokens to mint
+     */
     function mint(address account, uint256 amount) external onlyStakingContract {
         uint256 shareAmount = _amountToShare(amount);
         _shares[account] += shareAmount;
@@ -158,7 +237,12 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         _mint(account, amount);
     }
 
-    // Replace your existing burn function with this
+    /**
+     * @notice Burns tokens
+     * @dev Can only be called by staking contract
+     * @param account Address to burn tokens from
+     * @param amount Amount of tokens to burn
+     */
     function burn(address account, uint256 amount) external onlyStakingContract {
         uint256 shareAmount = _amountToShare(amount);
         _shares[account] -= shareAmount;
@@ -166,11 +250,21 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         _burn(account, amount);
     }    
 
+    /**
+     * @notice Returns token balance of an account
+     * @dev Override of ERC20 balanceOf to use share-based accounting
+     * @param account Address to check balance for
+     * @return Token balance of the account
+     */
     function balanceOf(address account) public view override returns (uint256) {
         return _shareToAmount(_shares[account]);
     }
 
-    // Admin functions
+    /**
+     * @notice Updates the reward rate
+     * @dev Can only be called by owner, capped at 30% APR
+     * @param _newRate New annual reward rate in basis points
+     */
     function setRewardRate(uint256 _newRate) external onlyOwner {
         require(_newRate <= 3000, "Rate too high"); // Max 30% APR
         emit RewardRateUpdated(rewardRate, _newRate);

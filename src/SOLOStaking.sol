@@ -1,3 +1,10 @@
+/**
+ * @title SOLO Staking Contract
+ * @author Original contract enhanced with NatSpec
+ * @notice This contract manages the staking of SOLO tokens and minting of stSOLO tokens
+ * @dev Implements staking mechanics with withdrawal delay and request management
+ */
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
@@ -6,6 +13,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./StSOLOToken.sol";
 
+/**
+ * @title SOLOStaking
+ * @notice A staking contract that allows users to stake SOLO tokens and receive stSOLO tokens
+ * @dev Inherits from Ownable and ReentrancyGuard for secure management of staking operations
+ */
 contract SOLOStaking is Ownable, ReentrancyGuard {
     // State variables
     IERC20 public soloToken;
@@ -15,6 +27,10 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
     uint256 public constant MIN_WITHDRAWAL_DELAY = 0 days;
     uint256 public constant MAX_WITHDRAWAL_DELAY = 30 days;
 
+    /**
+     * @notice Structure to track withdrawal requests
+     * @dev Stores information about each withdrawal request including amounts and status
+     */
     struct WithdrawalRequest {
         uint256 soloAmount;    // Amount in SOLO tokens
         uint256 stSOLOAmount;  // Amount in stSOLO tokens at time of request
@@ -30,6 +46,13 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
     event WithdrawalProcessed(address indexed user, uint256 soloAmount, uint256 requestId);
     event WithdrawalDelayUpdated(uint256 oldDelay, uint256 newDelay);
 
+    /**
+     * @notice Contract constructor
+     * @dev Initializes the contract with token addresses and withdrawal delay
+     * @param _soloToken Address of the SOLO token contract
+     * @param _stSOLOToken Address of the stSOLO token contract
+     * @param _initialWithdrawalDelay Initial delay period for withdrawals
+     */
     constructor(
         address _soloToken,
         address _stSOLOToken,
@@ -46,7 +69,11 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
         withdrawalDelay = _initialWithdrawalDelay;
     }
 
-    // Admin functions
+    /**
+     * @notice Updates the withdrawal delay period
+     * @dev Can only be called by owner, enforces minimum and maximum delay limits
+     * @param _newDelay New delay period in seconds
+     */
     function setWithdrawalDelay(uint256 _newDelay) external onlyOwner {
         require(_newDelay >= MIN_WITHDRAWAL_DELAY && 
                 _newDelay <= MAX_WITHDRAWAL_DELAY, 
@@ -55,6 +82,12 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
         withdrawalDelay = _newDelay;
     }
 
+    /**
+     * @notice Stakes SOLO tokens and mints stSOLO tokens
+     * @dev Transfers SOLO tokens from user and mints equivalent stSOLO tokens
+     * @param _amount Amount of SOLO tokens to stake
+     * @param _recipient Address to receive the stSOLO tokens
+     */
     function stake(uint256 _amount, address _recipient) external nonReentrant {
         require(_amount > 0, "Cannot stake 0");
         require(_recipient != address(0), "Invalid recipient");
@@ -71,7 +104,11 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
         emit Staked(msg.sender, _recipient, _amount);
     }
 
-
+    /**
+     * @notice Initiates a withdrawal request for stSOLO tokens
+     * @dev Burns stSOLO tokens and creates a withdrawal request for SOLO tokens
+     * @param stSOLOAmount Amount of stSOLO tokens to withdraw
+     */
     function requestWithdrawal(uint256 stSOLOAmount) external nonReentrant {
         require(stSOLOAmount > 0, "Cannot withdraw 0");
         require(stSOLOToken.balanceOf(msg.sender) >= stSOLOAmount, 
@@ -100,6 +137,11 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
         emit WithdrawalRequested(msg.sender, stSOLOAmount, soloAmount, requestId);
     }
 
+    /**
+     * @notice Processes a pending withdrawal request
+     * @dev Transfers SOLO tokens back to user after delay period
+     * @param _requestId ID of the withdrawal request to process
+     */
     function processWithdrawal(uint256 _requestId) external nonReentrant {
         require(_requestId < withdrawalRequests[msg.sender].length, 
                 "Invalid request ID");
@@ -118,7 +160,15 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
         emit WithdrawalProcessed(msg.sender, request.soloAmount, _requestId);
     }
 
-    // View functions
+    /**
+     * @notice Retrieves all withdrawal requests for a user
+     * @dev Returns arrays of withdrawal request details
+     * @param _user Address of the user
+     * @return soloAmounts Array of SOLO token amounts
+     * @return stSOLOAmounts Array of stSOLO token amounts
+     * @return requestTimes Array of request timestamps
+     * @return processed Array of processing status flags
+     */
     function getPendingWithdrawals(address _user) 
         external 
         view 
