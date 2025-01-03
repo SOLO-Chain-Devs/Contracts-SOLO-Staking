@@ -37,7 +37,8 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     uint256 public constant MIN_REBASE_INTERVAL = 1 hours;
     uint256 public constant MAX_REBASE_INTERVAL = 30 days;
     address public constant DEAD_ADDRESS = address(0x000000000000000000000000000000000000dEaD);
-
+    uint256 private _totalNormalShares;
+    uint256 private _totalExcludedShares;
     /**
      * @notice Ensures only the staking contract can call the function
      * @dev Modifier to restrict certain functions to the staking contract
@@ -168,8 +169,10 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @return Equivalent token amount
      */
     function _shareToAmount(uint256 share) internal view returns (uint256) {
-        if (_totalShares == 0) return share;
-        return (share * totalSupply()) / _totalShares;
+        if (_totalNormalShares == 0) return share;
+        // For non-excluded accounts, calculate based on total supply minus excluded amount
+        uint256 rebasableSupply = totalSupply() - calculateExcludedAmount();
+        return (share * rebasableSupply) / _totalNormalShares;
     }
 
     /**
@@ -202,7 +205,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
 
         // Improved precision handling
         uint256 timeElapsed = block.timestamp - lastRebaseTime;
-        uint256 rebaseAmount = (rebasableSupply * timeElapsed * rewardRate) / (SECONDS_PER_YEAR * 100);
+        uint256 rebaseAmount = (rebasableSupply * timeElapsed * rewardRate) / (SECONDS_PER_YEAR * 10000);
 
         if (rebaseAmount > 0) {
             _mint(DEAD_ADDRESS, rebaseAmount);
@@ -253,17 +256,15 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @param account Address to mint tokens to
      * @param amount Amount of tokens to mint
      */
-    function mint(address account, uint256 amount) external onlyStakingContract nonReentrant {
-        require(account != address(0), "Invalid address");
-        
-        uint256 shareAmount = _amountToShare(amount);
-        
-        _shares[account] += shareAmount;
-        _totalShares += shareAmount;
+    function mint(address account, uint256 amount) external onlyStakingContract {
+        if (excludedFromRebase[account]) {
+            _totalExcludedShares += amount;
+        } else {
+            _totalNormalShares += _amountToShare(amount);
+        }
         _mint(account, amount);
-        
-        emit Minted(account, amount, shareAmount);
     }
+    
 
     /**
      * @notice Burns tokens
@@ -289,7 +290,10 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @return Token balance of the account
      */
     function balanceOf(address account) public view override returns (uint256) {
-        return _shareToAmount(_shares[account]);
+        if (excludedFromRebase[account]) {
+            return _shares[account]; // For excluded accounts, return shares directly
+        }
+        return _shareToAmount(_shares[account]); // Normal conversion for others
     }
 
     /**
