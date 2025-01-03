@@ -1,0 +1,125 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "forge-std/Test.sol";
+import "../src/SOLOStaking.sol";
+import "../src/StSOLOToken.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+contract MockSOLO is ERC20 {
+    constructor() ERC20("SOLO Token", "SOLO") {
+        _mint(msg.sender, 1000000 * 10**decimals());
+    }
+}
+
+contract SOLOStakingTest is Test {
+    SOLOStaking public stakingContract;
+    StSOLOToken public stSOLOToken;
+    MockSOLO public soloToken;
+
+    address public owner;
+    address public alice;
+    address public bob;
+    uint256 public constant INITIAL_AMOUNT = 1000 * 10**18;
+    uint256 public constant INITIAL_REWARD_RATE = 500; // 5% APR
+    uint256 public constant INITIAL_WITHDRAWAL_DELAY = 7 days;
+
+    function setUp() public {
+        owner = address(this);
+        alice = makeAddr("alice");
+        bob = makeAddr("bob");
+
+        soloToken = new MockSOLO();
+        stSOLOToken = new StSOLOToken(INITIAL_REWARD_RATE);
+        stakingContract = new SOLOStaking(
+            address(soloToken),
+            address(stSOLOToken),
+            INITIAL_WITHDRAWAL_DELAY
+        );
+
+        stSOLOToken.setStakingContract(address(stakingContract));
+
+        soloToken.transfer(alice, INITIAL_AMOUNT);
+        soloToken.transfer(bob, INITIAL_AMOUNT);
+
+        vm.startPrank(alice);
+        soloToken.approve(address(stakingContract), 1 ether);
+        stakingContract.stake(1 ether, alice);
+        vm.stopPrank();
+    }
+
+    /**
+     * @notice Verifies the initial setup of the staking system
+     * @dev Checks contract addresses, withdrawal delay, and reward rate
+     */
+    function test_InitialSetup() public view {
+        assertEq(address(stakingContract.soloToken()), address(soloToken));
+        assertEq(address(stakingContract.stSOLOToken()), address(stSOLOToken));
+        assertEq(stakingContract.withdrawalDelay(), INITIAL_WITHDRAWAL_DELAY);
+        assertEq(stSOLOToken.rewardRate(), INITIAL_REWARD_RATE);
+    }
+
+    /**
+     * @notice Tests setting an excessive reward rate
+     * @dev Verifies that setting a reward rate above 30% APR reverts
+     */
+    function test_RevertWhen_SettingExcessiveRewardRate() public {
+        uint256 tooHighRate = 3100; // 31% APR
+        vm.expectRevert("Rate too high");
+        vm.prank(owner);
+        stSOLOToken.setRewardRate(tooHighRate);
+    }
+
+    /**
+     * @notice Tests setting an excessive withdrawal delay
+     * @dev Verifies that setting a delay above 30 days reverts
+     */
+    function test_RevertWhen_SettingExcessiveWithdrawalDelay() public {
+        uint256 tooLongDelay = 31 days;
+        vm.expectRevert("Invalid delay");
+        vm.prank(owner);
+        stakingContract.setWithdrawalDelay(tooLongDelay);
+    }
+
+    /**
+     * @notice Tests staking to zero address
+     * @dev Verifies that attempting to stake to address(0) reverts
+     */
+    function test_RevertWhen_StakingToZeroAddress() public {
+        vm.expectRevert("Invalid recipient");
+        vm.prank(alice);
+        stakingContract.stake(100 * 10**18, address(0));
+    }
+
+    /**
+     * @notice Tests staking zero amount
+     * @dev Verifies that attempting to stake 0 tokens reverts
+     */
+    function test_RevertWhen_StakingZero() public {
+        vm.expectRevert("Cannot stake 0");
+        vm.prank(alice);
+        stakingContract.stake(0, alice);
+    }
+
+    /**
+     * @notice Tests updating reward rate
+     * @dev Verifies reward rate can be updated within allowed range
+     */
+    function test_UpdateRewardRate() public {
+        uint256 newRate = 1000; // 10% APR
+        vm.prank(owner);
+        stSOLOToken.setRewardRate(newRate);
+        assertEq(stSOLOToken.rewardRate(), newRate);
+    }
+
+    /**
+     * @notice Tests updating withdrawal delay
+     * @dev Verifies withdrawal delay can be updated within allowed range
+     */
+    function test_UpdateWithdrawalDelay() public {
+        uint256 newDelay = 14 days;
+        vm.prank(owner);
+        stakingContract.setWithdrawalDelay(newDelay);
+        assertEq(stakingContract.withdrawalDelay(), newDelay);
+    }
+}
