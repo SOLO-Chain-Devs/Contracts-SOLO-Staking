@@ -32,6 +32,11 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     uint256 public rewardRate; // Annual reward rate in basis points (1 = 0.01%)
     uint256 public constant SECONDS_PER_YEAR = 31536000;
     address public stakingContract;
+    
+    uint256 public rebaseInterval;  // Time between rebases in seconds
+    uint256 public constant MIN_REBASE_INTERVAL = 1 hours;
+    uint256 public constant MAX_REBASE_INTERVAL = 30 days;
+    address public constant DEAD_ADDRESS = address(0x000000000000000000000000000000000000dEaD);
 
     /**
      * @notice Ensures only the staking contract can call the function
@@ -46,7 +51,10 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     event RebaseOccurred(uint256 totalSupply, uint256 rebaseAmount, uint256 excludedAmount);
     event RewardRateUpdated(uint256 oldRate, uint256 newRate);
     event AddressExcluded(address indexed account, bool excluded);
-
+    // TODO added these to help
+    event Minted(address indexed account, uint256 amount, uint256 shares);
+    event Burned(address indexed account, uint256 amount, uint256 shares);
+    event RebaseIntervalUpdated(uint256 interval);
     /**
      * @notice Contract constructor
      * @dev Initializes the contract with an initial reward rate
@@ -55,11 +63,22 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     constructor(uint256 _initialRewardRate) ERC20("Staked SOLO", "stSOLO") Ownable(msg.sender) {
             rewardRate = _initialRewardRate;
             lastRebaseTime = block.timestamp;
+        rebaseInterval = 1 days;
+
         // Initialize with minimal amount to establish share ratio
-        _mint(msg.sender, 1);
-        _shares[msg.sender] = 1;
-        _totalShares = 1;
+        uint256 INITIAL_AMOUNT = 10**18; 
+        _mint(msg.sender, INITIAL_AMOUNT);
+        _shares[msg.sender] = INITIAL_AMOUNT;
+        _totalShares = INITIAL_AMOUNT;
         }
+
+
+    function setRebaseInterval(uint256 _newInterval) external onlyOwner {
+        require(_newInterval >= MIN_REBASE_INTERVAL, "Interval too short");
+        require(_newInterval <= MAX_REBASE_INTERVAL, "Interval too long");
+        rebaseInterval = _newInterval;
+        emit RebaseIntervalUpdated(rebaseInterval);
+    }
 
     /**
      * @notice Sets the staking contract address
@@ -168,8 +187,9 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @dev Distributes rewards to non-excluded token holders
      * @return Amount of tokens minted in the rebase
      */
-    function rebase() external returns (uint256) {
-        require(block.timestamp >= lastRebaseTime + 1 days, "Too soon to rebase");
+    function rebase() external nonReentrant returns (uint256) {
+        require(msg.sender == stakingContract || msg.sender == owner(), "Unauthorized");
+        require(block.timestamp >= lastRebaseTime + rebaseInterval, "Too soon to rebase");
         
         uint256 currentSupply = totalSupply();
         uint256 excludedAmount = calculateExcludedAmount();
@@ -180,13 +200,12 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
             return 0;
         }
 
-        // Calculate rewards since last rebase
+        // Improved precision handling
         uint256 timeElapsed = block.timestamp - lastRebaseTime;
-        uint256 rewardPerSecond = rewardRate * 1e14 / SECONDS_PER_YEAR;
-        uint256 rebaseAmount = (rebasableSupply * timeElapsed * rewardPerSecond) / 1e18;
+        uint256 rebaseAmount = (rebasableSupply * timeElapsed * rewardRate) / (SECONDS_PER_YEAR * 100);
 
         if (rebaseAmount > 0) {
-            _mint(address(this), rebaseAmount);
+            _mint(DEAD_ADDRESS, rebaseAmount);
             lastRebaseTime = block.timestamp;
         }
 
@@ -234,11 +253,16 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @param account Address to mint tokens to
      * @param amount Amount of tokens to mint
      */
-    function mint(address account, uint256 amount) external onlyStakingContract {
+    function mint(address account, uint256 amount) external onlyStakingContract nonReentrant {
+        require(account != address(0), "Invalid address");
+        
         uint256 shareAmount = _amountToShare(amount);
+        
         _shares[account] += shareAmount;
         _totalShares += shareAmount;
         _mint(account, amount);
+        
+        emit Minted(account, amount, shareAmount);
     }
 
     /**
@@ -247,11 +271,15 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @param account Address to burn tokens from
      * @param amount Amount of tokens to burn
      */
-    function burn(address account, uint256 amount) external onlyStakingContract {
+    function burn(address account, uint256 amount) external onlyStakingContract nonReentrant {
         uint256 shareAmount = _amountToShare(amount);
+        require(shareAmount <= _shares[account], "Insufficient shares");
+        
         _shares[account] -= shareAmount;
         _totalShares -= shareAmount;
         _burn(account, amount);
+        
+        emit Burned(account, amount, shareAmount);
     }    
 
     /**
