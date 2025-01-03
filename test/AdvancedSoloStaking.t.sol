@@ -169,12 +169,12 @@ contract SOLOStakingFailingTest is Test {
 
         // Stage 6: Assertions
         assertEq(stSOLOToken.balanceOf(bob), stakeAmount, "Bob's balance should remain at stake amount");
-        /*assertTrue(
+        assertTrue(
             stSOLOToken.balanceOf(alice) > aliceBalanceBeforeExclusion,
             "Alice's balance should increase after rebase"
         );
         console.log("Alice's balance increase:",
-                    stSOLOToken.balanceOf(alice) - aliceBalanceBeforeExclusion); */
+                    stSOLOToken.balanceOf(alice) - aliceBalanceBeforeExclusion);
     }
 
     /**

@@ -168,12 +168,10 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @param share Number of shares to convert
      * @return Equivalent token amount
      */
-    function _shareToAmount(uint256 share) internal view returns (uint256) {
-        if (_totalNormalShares == 0) return share;
-        // For non-excluded accounts, calculate based on total supply minus excluded amount
-        uint256 rebasableSupply = totalSupply() - calculateExcludedAmount();
-        return (share * rebasableSupply) / _totalNormalShares;
-    }
+function _shareToAmount(uint256 share) internal view returns (uint256) {
+    if (_totalShares == 0) return share;  
+    return (share * totalSupply()) / _totalShares;
+}
 
     /**
      * @notice Converts token amount to shares
@@ -223,32 +221,31 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @param to Address tokens are transferred to
      * @param amount Amount of tokens transferred
      */
-    function _update(
-        address from,
-        address to,
-        uint256 amount
-    ) internal virtual override {
-        uint256 shareAmount = _amountToShare(amount);
-        
-        // Handle outgoing transfers and burns
-        if (from != address(0)) {
-            require(shareAmount <= _shares[from], "Insufficient shares");
-            _shares[from] -= shareAmount;
-        } else {
-            // Minting new tokens, increase total shares
-            _totalShares += shareAmount;
-        }
-        
-        // Handle incoming transfers and mints
-        if (to != address(0)) {
-            _shares[to] += shareAmount;
-        } else {
-            // Burning tokens, decrease total shares
-            _totalShares -= shareAmount;
-        }
-        
-        super._update(from, to, amount);
+function _update(address from, address to, uint256 amount) internal virtual override {
+    uint256 shareAmount;
+    if (excludedFromRebase[to] || excludedFromRebase[from]) {
+        shareAmount = amount;
+    } else {
+        shareAmount = _amountToShare(amount);
     }
+    
+    if (from != address(0)) {
+        require(shareAmount <= _shares[from], "Insufficient shares");
+        _shares[from] -= shareAmount;
+        if (!excludedFromRebase[from]) {
+            _totalNormalShares -= shareAmount;
+        }
+    }
+    
+    if (to != address(0)) {
+        _shares[to] += shareAmount;
+        if (!excludedFromRebase[to]) {
+            _totalNormalShares += shareAmount;
+        }
+    }
+    
+    super._update(from, to, amount);
+}
 
     /**
      * @notice Mints new tokens
