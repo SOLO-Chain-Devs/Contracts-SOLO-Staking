@@ -99,8 +99,9 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      */
     function setExcluded(address account, bool excluded) external onlyOwner {
         require(account != address(0), "Invalid address");
-        
+
         if (excluded && !excludedFromRebase[account]) {
+            require(balanceOf(account) == 0, "Cannot exclude account with non-zero balance");
             excludedFromRebase[account] = true;
             excludedAddresses.push(account);
         } else if (!excluded && excludedFromRebase[account]) {
