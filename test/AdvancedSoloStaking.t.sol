@@ -116,9 +116,9 @@ contract SOLOStakingFailingTest is Test {
     }
 
 
-    function test_ExcludeFromRebasePreExcluded() public {
+    function test_Exclude_FromRebasePreExcluded() public {
         uint256 stakeAmount = 100 * 10**18;
-        logHeader("test_ExcludeFromRebasePreExcluded");
+        logHeader("test_Exclude_FromRebasePreExcluded");
 
         // Log initial state
         logEth("Initial total shares:", stSOLOToken.totalShares());
@@ -181,135 +181,305 @@ contract SOLOStakingFailingTest is Test {
         assertEq(stSOLOToken.balanceOf(bob), stakeAmount);
     }
 
-    /**
-        * @notice Tests the rebasing mechanism with excluded addresses
-    * @dev Verifies that excluded addresses don't receive rebase rewards while others do
-        */
-    function test_ExcludeFromRebasePostExcluded() public {
-        logHeader("test_ExcludeFromRebasePostExcluded");
-        uint256 stakeAmount = 100 * 10**18;
 
-        // Stage 1: Initial Staking
-        vm.startPrank(alice);
-        soloToken.approve(address(stakingContract), stakeAmount);
-        stakingContract.stake(stakeAmount, alice);
-        console.log("\nAfter Alice stakes:");
-        logEth("Alice initial shares:",stSOLOToken.shareOf(alice));
-        logEth("Alice initial shares:", stSOLOToken.shareOf(alice));
-        logEth("Alice initial balance:", stSOLOToken.balanceOf(alice));
-        vm.stopPrank();
-
-        vm.startPrank(bob);
-        soloToken.approve(address(stakingContract), stakeAmount);
-        stakingContract.stake(stakeAmount, bob);
-        logMinor("\nAfter Bob stakes:");
-        logEth("Bob initial shares:",stSOLOToken.shareOf(bob));
-        logEth("Bob initial balance:",stSOLOToken.balanceOf(bob));
-        vm.stopPrank();
-
-        // Stage 2: Pre-Exclusion State
-        console.log("\nPre-exclusion state:");
-        logEth("Total supply:", stSOLOToken.totalSupply());
-        logEth("Total shares:", stSOLOToken.totalShares());
-        uint256 aliceBalanceBeforeExclusion = stSOLOToken.balanceOf(alice);
-        //uint256 bobBalanceBeforeExclusion = stSOLOToken.balanceOf(bob);
-
-        // Stage 3: Apply Exclusion
-        vm.prank(owner);
-        stSOLOToken.setExcluded(bob, true);
-        console.log("\nPost-exclusion state:");
-        logBool("Is Bob excluded:", stSOLOToken.excludedFromRebase(bob));
-        logEth("Excluded amount:", stSOLOToken.calculateExcludedAmount());
-
-        // Stage 4: First Rebase Period
-        vm.warp(block.timestamp + 365 days);
-        uint256 rebaseAmount = stSOLOToken.rebase();
-        console.log("\nAfter first rebase:");
-        logEth("Rebase amount:", rebaseAmount);
-
-        // Stage 5: Final State Validation
-        console.log("\nFinal states:");
-        logEth("Alice final shares:", stSOLOToken.shareOf(alice));
-        logEth("Alice final balance:", stSOLOToken.balanceOf(alice));
-        logEth("Bob final shares:", stSOLOToken.shareOf(bob));
-        logEth("Bob final balance:", stSOLOToken.balanceOf(bob));
-        logEth("Total supply after:", stSOLOToken.totalSupply());
-
-        // Assertions
-        assertEq(stSOLOToken.balanceOf(bob), stakeAmount, "Bob's balance should remain at stake amount");
-        assertTrue(
-            stSOLOToken.balanceOf(alice) > aliceBalanceBeforeExclusion,
-            "Alice's balance should increase after rebase"
-        );
-        logEth("Alice's balance increase:", 
-            stSOLOToken.balanceOf(alice) - aliceBalanceBeforeExclusion);
-    }
+function test_YieldCalculationSimpleSingle() public {
+    // Fixed values for clear verification
+    uint256 daysToPass = 30;  // one month
+    uint256 stakeAmount = 100 * 1e18;  // 100 tokens
     
+    // Get initial timestamp
+    uint256 startTime = vm.getBlockTimestamp();
+    uint256 yearlyRate = INITIAL_REWARD_RATE;
+    
+    logHeader("test_YieldCalculationSimpleSingle");
+    logMinor("Test Parameters:");
+    logEth("Stake amount:", stakeAmount);
+    logEth("Days to pass:", daysToPass);
+    logEth("Start time:", startTime);
+    
+    // Perform staking
+    vm.startPrank(alice);
+    soloToken.approve(address(stakingContract), stakeAmount);
+    stakingContract.stake(stakeAmount, alice);
+    
+    uint256 initialStSOLOBalance = stSOLOToken.balanceOf(alice);
+    logEth("Initial stSOLO balance:", initialStSOLOBalance);
+    vm.stopPrank();
 
-    function test_ExcludeFromRebaseYieldPostExcluded(uint256 _daysToPass) public {
+    // Advance time
+    vm.warp(startTime + (daysToPass * 1 days));
+    uint256 newTimestamp = vm.getBlockTimestamp();
+    assertEq(newTimestamp, startTime + (daysToPass * 1 days), "Time warp failed");
+    
+    // Perform rebase and collect results
+    uint256 rebaseAmount = stSOLOToken.rebase();
+    uint256 finalBalance = stSOLOToken.balanceOf(alice);
+    
+    // Calculate yields
+    uint256 actualYield = finalBalance - initialStSOLOBalance;
+    uint256 expectedYield = (initialStSOLOBalance * daysToPass * yearlyRate) / (365 * 10000);
+    
+    logMajor("Results:");
+    logEth("Time elapsed:", newTimestamp - startTime);
+    logEth("Rebase amount:", rebaseAmount);
+    logEth("Final balance:", finalBalance);
+    logEth("Actual yield:", actualYield);
+    logEth("Expected yield:", expectedYield);
+    
+    // Verify results
+    assertGt(finalBalance, initialStSOLOBalance, "Balance should increase after rebase");
+    assertApproxEqRel(
+        actualYield,
+        expectedYield,
+        5e15, // 0.5% tolerance
+        "Yield calculation exceeded tolerance"
+    );
+}
+
+    function test_YieldCalculationSimpleMultiUser() public {
+        address[] memory users = new address[](4);
+        uint256[] memory stakeAmounts = new uint256[](4);
+        
+        // Setup test users with different stake amounts
+        users[0] = alice;        // our existing alice
+        users[1] = bob;          // our existing bob
+        users[2] = makeAddr("charlie");
+        users[3] = makeAddr("david");
+        
+        stakeAmounts[0] = 100 * 1e18;   // 100 tokens
+        stakeAmounts[1] = 250 * 1e18;   // 250 tokens
+        stakeAmounts[2] = 500 * 1e18;   // 500 tokens
+        stakeAmounts[3] = 1000 * 1e18;  // 1000 tokens
+        
+        // Give tokens to new users
+        soloToken.transfer(users[2], 1000 * 1e18);
+        soloToken.transfer(users[3], 1000 * 1e18);
+        
+        uint256 startTime = vm.getBlockTimestamp();
+        uint256 yearlyRate = INITIAL_REWARD_RATE;
+        
+        logHeader("Multi-User Yield Test");
+        logMinor("Initial Setup");
+        
+        // Track balances through time
+        uint256[][] memory userBalances = new uint256[][](4);
+        for(uint256 i = 0; i < 4; i++) {
+            userBalances[i] = new uint256[](5); // Track 5 periods
+        }
+        
+        // Initial stakes
+        for(uint256 i = 0; i < users.length; i++) {
+            vm.startPrank(users[i]);
+            soloToken.approve(address(stakingContract), stakeAmounts[i]);
+            stakingContract.stake(stakeAmounts[i], users[i]);
+            userBalances[i][0] = stSOLOToken.balanceOf(users[i]);
+            vm.stopPrank();
+            
+            logMinor(string.concat("User ", vm.toString(i)));
+            logEth("Initial stake:", stakeAmounts[i]);
+            logEth("Initial stSOLO:", userBalances[i][0]);
+        }
+        
+        // Simulate 4 weeks with weekly rebases
+        for(uint256 week = 1; week <= 4; week++) {
+            // Advance time by 1 week
+            vm.warp(startTime + (week * 7 days));
+            
+            logMajor(string.concat("Week ", vm.toString(week)));
+            
+            // Perform rebase
+            uint256 rebaseAmount = stSOLOToken.rebase();
+            logEth("Rebase amount:", rebaseAmount);
+            
+            // Track all balances
+            for(uint256 i = 0; i < users.length; i++) {
+                uint256 currentBalance = stSOLOToken.balanceOf(users[i]);
+                userBalances[i][week] = currentBalance;
+                
+                // Calculate and verify yield
+                uint256 totalYield = currentBalance - userBalances[i][0];
+                uint256 expectedYield = (userBalances[i][0] * (week * 7) * yearlyRate) / (365 * 10000);
+                
+                logMinor(string.concat("User ", vm.toString(i)));
+                logEth("Current balance:", currentBalance);
+                logEth("Total yield:", totalYield);
+                logEth("Expected yield:", expectedYield);
+                
+                // Verify yield is within tolerance
+                assertApproxEqRel(
+                    totalYield,
+                    expectedYield,
+                    5e15, // 0.5% tolerance
+                    string.concat("Yield mismatch for user ", vm.toString(i))
+                );
+                
+                // Verify relative yields between users maintain proportions
+                if(i > 0) {
+                    uint256 yieldRatio = (totalYield * 1e18) / stakeAmounts[i];
+                    uint256 previousYieldRatio = ((userBalances[0][week] - userBalances[0][0]) * 1e18) / stakeAmounts[0];
+                    assertApproxEqRel(
+                        yieldRatio,
+                        previousYieldRatio,
+                        1e16, // 1% tolerance for ratio comparison
+                        "Yield ratios should be proportional"
+                    );
+                }
+            }
+        }
+        
+        // Final yield analysis
+        logMajor("Final Analysis");
+        for(uint256 i = 0; i < users.length; i++) {
+            uint256 totalReturn = ((userBalances[i][4] - userBalances[i][0]) * 10000) / userBalances[i][0];
+            logMinor(string.concat("User ", vm.toString(i)));
+            logEth("Total return (bp):", totalReturn);
+        }
+    }
+
+function test_YieldCalculationSingleFuzz(uint96 _daysToPass, uint96 _rawAmount) public {
+    // First, bound the days reasonably
+    uint256 daysToPass = bound(_daysToPass, 1, 365);
+    
+    // Calculate bounds for tokens considering decimals
+    uint256 maxTokens = soloToken.balanceOf(alice) / 1e18;  // Convert to whole tokens
+    uint256 numTokens = bound(_rawAmount, 1, maxTokens / 2);  // Stake up to half available
+    uint256 stakeAmount = numTokens * 1e18;  // Convert back to token units
+    
+    // Get initial timestamp
+    uint256 startTime = vm.getBlockTimestamp();
+    uint256 yearlyRate = INITIAL_REWARD_RATE;
+    
+    logHeader("test_YieldCalculationFuzz");
+    logMinor("Test Parameters:");
+    logEth("Available tokens:", maxTokens * 1e18);
+    logEth("Stake amount:", stakeAmount);
+    logEth("Days to pass:", daysToPass);
+    logEth("Start time:", startTime);
+    
+    // Perform staking
+    vm.startPrank(alice);
+    soloToken.approve(address(stakingContract), stakeAmount);
+    stakingContract.stake(stakeAmount, alice);
+    
+    uint256 initialStSOLOBalance = stSOLOToken.balanceOf(alice);
+    logEth("Initial stSOLO balance:", initialStSOLOBalance);
+    vm.stopPrank();
+
+    // Advance time
+    vm.warp(startTime + (daysToPass * 1 days));
+    uint256 newTimestamp = vm.getBlockTimestamp();
+    assertEq(newTimestamp, startTime + (daysToPass * 1 days), "Time warp failed");
+    
+    // Perform rebase and collect results
+    uint256 rebaseAmount = stSOLOToken.rebase();
+    uint256 finalBalance = stSOLOToken.balanceOf(alice);
+    
+    // Calculate yields
+    uint256 actualYield = finalBalance - initialStSOLOBalance;
+    uint256 expectedYield = (initialStSOLOBalance * daysToPass * yearlyRate) / (365 * 10000);
+    
+    logMajor("Results:");
+    logEth("Time elapsed:", newTimestamp - startTime);
+    logEth("Rebase amount:", rebaseAmount);
+    logEth("Final balance:", finalBalance);
+    logEth("Actual yield:", actualYield);
+    logEth("Expected yield:", expectedYield);
+    
+    // Verify results
+    assertGt(finalBalance, initialStSOLOBalance, "Balance should increase after rebase");
+    assertApproxEqRel(
+        actualYield,
+        expectedYield,
+        5e15, // 0.5% tolerance
+        "Yield calculation exceeded tolerance"
+    );
+}
+
+
+
+
+
+    /**
+     * @notice Tests that accounts with non-zero stSOLO balance cannot be excluded
+     * @dev Verifies the new balance check requirement in setExcluded
+     */
+    function test_Exclude_RevertWhen_ExcludingAccountWithBalance() public {
         uint256 stakeAmount = 100 * 10**18;
+        logHeader("test_Exclude_RevertWhen_ExcludingAccountWithBalance");
         
-        uint256 daysToPass = bound(_daysToPass, 1, 365);
-        
-        // For clarity, let's calculate expected yields upfront
-        uint256 yearlyRate = INITIAL_REWARD_RATE; 
-        uint256 expectedDailyYield = (yearlyRate * 1e18) / (365 * 10000); 
-        
-        logHeader("test_ExcludeFromRebasePostExcluded");
-        logMinor("Test Parameters:");
-        logEth("Days to pass:", daysToPass);
-        logEth("Yearly APR (basis points):", yearlyRate);
-        logEth("Expected daily yield %:", expectedDailyYield);
-
-        // Original staking logic for Alice and Bob...
-        vm.startPrank(alice);
-        soloToken.approve(address(stakingContract), stakeAmount);
-        stakingContract.stake(stakeAmount, alice);
-        vm.stopPrank();
-
+        // First, have Bob stake some tokens
         vm.startPrank(bob);
         soloToken.approve(address(stakingContract), stakeAmount);
         stakingContract.stake(stakeAmount, bob);
         vm.stopPrank();
-
-        // Record pre-exclusion states
-        uint256 aliceBalanceBefore = stSOLOToken.balanceOf(alice);
-        uint256 bobBalanceBefore = stSOLOToken.balanceOf(bob);
-
+        
+        logMinor("Initial state:");
+        logEth("Bob's stSOLO balance:", stSOLOToken.balanceOf(bob));
+        
+        // Try to exclude Bob - should revert
         vm.prank(owner);
+        vm.expectRevert("Cannot exclude account with non-zero balance");
         stSOLOToken.setExcluded(bob, true);
-
-        // Warp time and rebase
-        vm.warp(block.timestamp + (daysToPass * 1 days));
-        
-        logMajor("Pre-rebase State:");
-        logEth("Time elapsed (days):", daysToPass);
-        logEth("Alice initial balance:", aliceBalanceBefore);
-        logEth("Bob initial balance:", bobBalanceBefore);
-
-        uint256 rebaseAmount = stSOLOToken.rebase();
-        
-        uint256 aliceBalanceAfter = stSOLOToken.balanceOf(alice);
-        uint256 actualYieldAmount = aliceBalanceAfter - aliceBalanceBefore;
-        uint256 actualYieldPercentage = (actualYieldAmount * 1e18) / aliceBalanceBefore;
-        
-        logMajor("Post-rebase Results:");
-        logEth("Rebase amount:", rebaseAmount);
-        logEth("Alice new balance:", aliceBalanceAfter);
-        logEth("Actual yield amount:", actualYieldAmount);
-        logEth("Actual yield percentage:", actualYieldPercentage);
-        
-        // Calculate expected yield for comparison
-        uint256 expectedYield = (aliceBalanceBefore * daysToPass * yearlyRate) / (365 * 10000);
-        logEth("Expected yield amount:", expectedYield);
-        
-        // Original assertions plus yield validation
-        assertEq(stSOLOToken.balanceOf(bob), bobBalanceBefore, "Bob's balance should remain fixed");
-        assertTrue(aliceBalanceAfter > aliceBalanceBefore, "Alice's balance should increase after rebase");
-        assertApproxEqRel(actualYieldAmount, expectedYield, 1e16, "Yield should match expected amount within 1%");
     }
 
+    /**
+     * @notice Tests exclusion of accounts with zero balance
+     * @dev Verifies accounts can be excluded before staking
+     */
+    function test_Exclude_CanExcludeAccountWithZeroBalance() public {
+        logHeader("test_Exclude_CanExcludeAccountWithZeroBalance");
+        
+        // Try to exclude Bob before he has any stake
+        vm.prank(owner);
+        stSOLOToken.setExcluded(bob, true);
+        
+        logMinor("After exclusion:");
+        logBool("Is Bob excluded:", stSOLOToken.excludedFromRebase(bob));
+        
+        // Now Bob stakes after being excluded
+        uint256 stakeAmount = 100 * 10**18;
+        vm.startPrank(bob);
+        soloToken.approve(address(stakingContract), stakeAmount);
+        stakingContract.stake(stakeAmount, bob);
+        vm.stopPrank();
+        
+        logMinor("After staking:");
+        logEth("Bob's balance:", stSOLOToken.balanceOf(bob));
+        
+        assertEq(stSOLOToken.balanceOf(bob), stakeAmount, "Bob's balance should equal stake amount");
+    }
 
+    /**
+     * @notice Tests removal of exclusion status regardless of balance
+     * @dev Verifies exclusion can be removed even with non-zero balance
+     */
+    function test_Exclude_CanRemoveExclusionRegardlessOfBalance() public {
+        logHeader("test_Exclude_CanRemoveExclusionRegardlessOfBalance");
+        
+        // First exclude Bob (when he has no balance)
+        vm.prank(owner);
+        stSOLOToken.setExcluded(bob, true);
+        
+        logMinor("Initial exclusion:");
+        logBool("Is Bob excluded:", stSOLOToken.excludedFromRebase(bob));
+        
+        // Bob stakes some tokens
+        uint256 stakeAmount = 100 * 10**18;
+        vm.startPrank(bob);
+        soloToken.approve(address(stakingContract), stakeAmount);
+        stakingContract.stake(stakeAmount, bob);
+        vm.stopPrank();
+        
+        logMinor("After staking:");
+        logEth("Bob's balance:", stSOLOToken.balanceOf(bob));
+        
+        // Should be able to remove exclusion even with balance
+        vm.prank(owner);
+        stSOLOToken.setExcluded(bob, false);
+        
+        logMinor("After removing exclusion:");
+        logBool("Is Bob still excluded:", stSOLOToken.excludedFromRebase(bob));
+    }
 
 
     /**
