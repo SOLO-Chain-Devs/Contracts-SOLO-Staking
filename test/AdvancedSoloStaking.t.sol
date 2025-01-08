@@ -66,8 +66,8 @@ contract SOLOStakingFailingTest is Test {
     function _getPadding(string memory label) private pure returns (string memory) {
         uint256 length = bytes(label).length;
         if (length < 14) return "\t\t\t\t";
-        if (length < 25) return "\t\t\t";
-        if (length < 35) return "\t\t";
+        if (length < 24) return "\t\t\t";
+        if (length < 33) return "\t\t";
         return "\t";
     }
 
@@ -175,9 +175,9 @@ contract SOLOStakingFailingTest is Test {
         uint256 aliceBalanceAfter = stSOLOToken.balanceOf(alice);
 
         // Add assertions for both accounts
-        assertEq(stSOLOToken.balanceOf(bob), stakeAmount, "Bob's balance should remain fixed");
         assertTrue(aliceBalanceAfter > aliceBalanceBefore, "Alice's balance should increase after rebase");
         logEth("Alice's balance increase:", aliceBalanceAfter - aliceBalanceBefore);    
+        assertEq(stSOLOToken.balanceOf(bob), stakeAmount, "Bob's balance should remain fixed");
         assertEq(stSOLOToken.balanceOf(bob), stakeAmount);
     }
 
@@ -186,68 +186,129 @@ contract SOLOStakingFailingTest is Test {
     * @dev Verifies that excluded addresses don't receive rebase rewards while others do
         */
     function test_ExcludeFromRebasePostExcluded() public {
-        uint256 stakeAmount = 100 * 10**18;
         logHeader("test_ExcludeFromRebasePostExcluded");
+        uint256 stakeAmount = 100 * 10**18;
 
-        // Log initial state
-        logEth("Initial total shares:", stSOLOToken.totalShares());
-        logEth("Initial total supply:", stSOLOToken.totalSupply());
-
-        // First, handle Alice's staking
+        // Stage 1: Initial Staking
         vm.startPrank(alice);
         soloToken.approve(address(stakingContract), stakeAmount);
         stakingContract.stake(stakeAmount, alice);
-        logMinor("After Alice stakes:");
-        logEth("Alice shares:", stSOLOToken.shareOf(alice));
-        logEth("Alice balance:", stSOLOToken.balanceOf(alice));
-        logEth("Total shares:", stSOLOToken.totalShares());
-        logEth("Total supply:", stSOLOToken.totalSupply());
+        console.log("\nAfter Alice stakes:");
+        logEth("Alice initial shares:",stSOLOToken.shareOf(alice));
+        logEth("Alice initial shares:", stSOLOToken.shareOf(alice));
+        logEth("Alice initial balance:", stSOLOToken.balanceOf(alice));
         vm.stopPrank();
 
-        // Then handle Bob's staking
         vm.startPrank(bob);
         soloToken.approve(address(stakingContract), stakeAmount);
         stakingContract.stake(stakeAmount, bob);
-        logMinor("After Bob stakes:");
-        logEth("Bob shares:", stSOLOToken.shareOf(bob));
-        logEth("Bob balance:", stSOLOToken.balanceOf(bob));
-        logEth("Total shares:", stSOLOToken.totalShares());
-        logEth("Total supply:", stSOLOToken.totalSupply());
+        logMinor("\nAfter Bob stakes:");
+        logEth("Bob initial shares:",stSOLOToken.shareOf(bob));
+        logEth("Bob initial balance:",stSOLOToken.balanceOf(bob));
         vm.stopPrank();
 
-        // Record initial balances before exclusion
-        uint256 aliceBalanceBefore = stSOLOToken.balanceOf(alice);
-        uint256 bobBalanceBefore = stSOLOToken.balanceOf(bob);
+        // Stage 2: Pre-Exclusion State
+        console.log("\nPre-exclusion state:");
+        logEth("Total supply:", stSOLOToken.totalSupply());
+        logEth("Total shares:", stSOLOToken.totalShares());
+        uint256 aliceBalanceBeforeExclusion = stSOLOToken.balanceOf(alice);
+        //uint256 bobBalanceBeforeExclusion = stSOLOToken.balanceOf(bob);
 
-        // Now exclude Bob after staking
+        // Stage 3: Apply Exclusion
         vm.prank(owner);
         stSOLOToken.setExcluded(bob, true);
-        logMinor("After Bob is excluded:");
+        console.log("\nPost-exclusion state:");
         logBool("Is Bob excluded:", stSOLOToken.excludedFromRebase(bob));
         logEth("Excluded amount:", stSOLOToken.calculateExcludedAmount());
 
-        // Advance time and trigger rebase
-        vm.warp(block.timestamp + 1 days);
-        logMajor("Before rebase:");
-        logEth("Bob shares:", stSOLOToken.shareOf(bob));
-        logEth("Bob balance:", stSOLOToken.balanceOf(bob));
-
+        // Stage 4: First Rebase Period
+        vm.warp(block.timestamp + 365 days);
         uint256 rebaseAmount = stSOLOToken.rebase();
-        logMajor("After rebase:");
+        console.log("\nAfter first rebase:");
         logEth("Rebase amount:", rebaseAmount);
-        logEth("Bob shares:", stSOLOToken.shareOf(bob));
-        logEth("Bob balance:", stSOLOToken.balanceOf(bob));
-        logEth("Alice shares:", stSOLOToken.shareOf(alice));
-        logEth("Alice balance:", stSOLOToken.balanceOf(alice));
-        logEth("Total shares:", stSOLOToken.totalShares());
-        logEth("Total supply:", stSOLOToken.totalSupply());
 
-        // Final assertions
-        assertEq(stSOLOToken.balanceOf(bob), bobBalanceBefore, "Bob's balance should remain fixed");
-        assertTrue(stSOLOToken.balanceOf(alice) > aliceBalanceBefore, "Alice's balance should increase after rebase");
-        logEth("Alice's balance increase:", stSOLOToken.balanceOf(alice) - aliceBalanceBefore);
+        // Stage 5: Final State Validation
+        console.log("\nFinal states:");
+        logEth("Alice final shares:", stSOLOToken.shareOf(alice));
+        logEth("Alice final balance:", stSOLOToken.balanceOf(alice));
+        logEth("Bob final shares:", stSOLOToken.shareOf(bob));
+        logEth("Bob final balance:", stSOLOToken.balanceOf(bob));
+        logEth("Total supply after:", stSOLOToken.totalSupply());
+
+        // Assertions
+        assertEq(stSOLOToken.balanceOf(bob), stakeAmount, "Bob's balance should remain at stake amount");
+        assertTrue(
+            stSOLOToken.balanceOf(alice) > aliceBalanceBeforeExclusion,
+            "Alice's balance should increase after rebase"
+        );
+        logEth("Alice's balance increase:", 
+            stSOLOToken.balanceOf(alice) - aliceBalanceBeforeExclusion);
     }
     
+
+    function test_ExcludeFromRebaseYieldPostExcluded(uint256 _daysToPass) public {
+        uint256 stakeAmount = 100 * 10**18;
+        
+        uint256 daysToPass = bound(_daysToPass, 1, 365);
+        
+        // For clarity, let's calculate expected yields upfront
+        uint256 yearlyRate = INITIAL_REWARD_RATE; 
+        uint256 expectedDailyYield = (yearlyRate * 1e18) / (365 * 10000); 
+        
+        logHeader("test_ExcludeFromRebasePostExcluded");
+        logMinor("Test Parameters:");
+        logEth("Days to pass:", daysToPass);
+        logEth("Yearly APR (basis points):", yearlyRate);
+        logEth("Expected daily yield %:", expectedDailyYield);
+
+        // Original staking logic for Alice and Bob...
+        vm.startPrank(alice);
+        soloToken.approve(address(stakingContract), stakeAmount);
+        stakingContract.stake(stakeAmount, alice);
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+        soloToken.approve(address(stakingContract), stakeAmount);
+        stakingContract.stake(stakeAmount, bob);
+        vm.stopPrank();
+
+        // Record pre-exclusion states
+        uint256 aliceBalanceBefore = stSOLOToken.balanceOf(alice);
+        uint256 bobBalanceBefore = stSOLOToken.balanceOf(bob);
+
+        vm.prank(owner);
+        stSOLOToken.setExcluded(bob, true);
+
+        // Warp time and rebase
+        vm.warp(block.timestamp + (daysToPass * 1 days));
+        
+        logMajor("Pre-rebase State:");
+        logEth("Time elapsed (days):", daysToPass);
+        logEth("Alice initial balance:", aliceBalanceBefore);
+        logEth("Bob initial balance:", bobBalanceBefore);
+
+        uint256 rebaseAmount = stSOLOToken.rebase();
+        
+        uint256 aliceBalanceAfter = stSOLOToken.balanceOf(alice);
+        uint256 actualYieldAmount = aliceBalanceAfter - aliceBalanceBefore;
+        uint256 actualYieldPercentage = (actualYieldAmount * 1e18) / aliceBalanceBefore;
+        
+        logMajor("Post-rebase Results:");
+        logEth("Rebase amount:", rebaseAmount);
+        logEth("Alice new balance:", aliceBalanceAfter);
+        logEth("Actual yield amount:", actualYieldAmount);
+        logEth("Actual yield percentage:", actualYieldPercentage);
+        
+        // Calculate expected yield for comparison
+        uint256 expectedYield = (aliceBalanceBefore * daysToPass * yearlyRate) / (365 * 10000);
+        logEth("Expected yield amount:", expectedYield);
+        
+        // Original assertions plus yield validation
+        assertEq(stSOLOToken.balanceOf(bob), bobBalanceBefore, "Bob's balance should remain fixed");
+        assertTrue(aliceBalanceAfter > aliceBalanceBefore, "Alice's balance should increase after rebase");
+        assertApproxEqRel(actualYieldAmount, expectedYield, 1e16, "Yield should match expected amount within 1%");
+    }
+
 
 
 
