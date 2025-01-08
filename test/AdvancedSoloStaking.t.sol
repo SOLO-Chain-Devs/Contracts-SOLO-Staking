@@ -24,6 +24,73 @@ contract SOLOStakingFailingTest is Test {
     uint256 public constant INITIAL_REWARD_RATE = 500; // 5% APR
     uint256 public constant INITIAL_WITHDRAWAL_DELAY = 7 days;
 
+    // HELPER functions
+    function _createRepeatedString(string memory char, uint256 count) private pure returns (string memory) {
+        string memory result = "";
+        for(uint256 i = 0; i < count; i++) {
+            result = string.concat(result, char);
+        }
+        return result;
+    }
+
+    function logHeader(string memory text) internal pure {
+        string memory headerPadding = _createRepeatedString(unicode"═", 20);
+        console.log(unicode"\n╔%s %s %s╗", headerPadding, text, headerPadding);
+    }
+
+    function logMajor(string memory text) internal pure {
+        string memory majorPadding = _createRepeatedString(unicode"▓", 5);
+        console.log(unicode"\n%s %s", majorPadding, text);
+    }
+
+    function logMinor(string memory text) internal pure {
+        console.log(unicode"\n»%s", text);
+    }
+
+    // Combined logging functions
+    function logHeaderWith(string memory text, uint256 value) internal pure {
+        logHeader(text);
+        logEth("Value:", value);
+    }
+
+    function logMajorWith(string memory text, uint256 value) internal pure {
+        logMajor(text);
+        logEth("Value:", value);
+    }
+
+    function logMinorWith(string memory text, bool value) internal pure {
+        logMinor(text);
+        logBool("Status:", value);
+    }
+
+    function _getPadding(string memory label) private pure returns (string memory) {
+        uint256 length = bytes(label).length;
+        if (length < 14) return "\t\t\t\t";
+        if (length < 25) return "\t\t\t";
+        if (length < 35) return "\t\t";
+        return "\t";
+    }
+
+    // Public logging functions
+    function logEth(string memory label, uint256 value) internal pure {
+        string memory padding = _getPadding(label);
+        console.log(
+            string.concat("%s", padding, "%d.%d"),
+            label,
+            value / 1 ether,
+            value % 1 ether
+        );
+    }
+
+    function logBool(string memory label, bool value) internal pure {
+        string memory padding = _getPadding(label);
+        console.log(
+            string.concat("%s", padding, "%s"),
+            label,
+            value ? "true" : "false"
+        );
+    }
+
     function setUp() public {
         owner = address(this);
         alice = makeAddr("alice");
@@ -51,66 +118,66 @@ contract SOLOStakingFailingTest is Test {
 
     function test_ExcludeFromRebasePreExcluded() public {
         uint256 stakeAmount = 100 * 10**18;
-        console.log("\n==================test_ExcludeFromRebasePreExcluded==========================");
+        logHeader("test_ExcludeFromRebasePreExcluded");
 
         // Log initial state
-        console.log("Initial total shares:", stSOLOToken.totalShares());
-        console.log("Initial total supply:", stSOLOToken.totalSupply());
+        logEth("Initial total shares:", stSOLOToken.totalShares());
+        logEth("Initial total supply:", stSOLOToken.totalSupply());
 
         // First, exclude Bob
         vm.prank(owner);
         stSOLOToken.setExcluded(bob, true);
-        console.log("Is Bob excluded:", stSOLOToken.excludedFromRebase(bob));
+        logBool("Is Bob excluded:", stSOLOToken.excludedFromRebase(bob));
 
         // Then handle staking
         vm.startPrank(alice);
         soloToken.approve(address(stakingContract), stakeAmount);
         stakingContract.stake(stakeAmount, alice);
-        console.log("\nAfter Alice stakes:");
-        console.log("Alice shares:", stSOLOToken.shareOf(alice));
-        console.log("Alice balance:", stSOLOToken.balanceOf(alice));
-        console.log("Total shares:", stSOLOToken.totalShares());
-        console.log("Total supply:", stSOLOToken.totalSupply());
+        logMinor("After Alice stakes:");
+        logEth("Alice shares:", stSOLOToken.shareOf(alice));
+        logEth("Alice balance:", stSOLOToken.balanceOf(alice));
+        logEth("Total shares:", stSOLOToken.totalShares());
+        logEth("Total supply:", stSOLOToken.totalSupply());
         vm.stopPrank();
 
         vm.startPrank(bob);
         soloToken.approve(address(stakingContract), stakeAmount);
         stakingContract.stake(stakeAmount, bob);
         console.log("\nAfter Bob stakes:");
-        console.log("Bob shares:", stSOLOToken.shareOf(bob));
-        console.log("Bob balance:", stSOLOToken.balanceOf(bob));
-        console.log("Total shares:", stSOLOToken.totalShares());
-        console.log("Total supply:", stSOLOToken.totalSupply());
-        console.log("Excluded amount:", stSOLOToken.calculateExcludedAmount());
+        logEth("Bob shares:", stSOLOToken.shareOf(bob));
+        logEth("Bob balance:", stSOLOToken.balanceOf(bob));
+        logEth("Total shares:", stSOLOToken.totalShares());
+        logEth("Total supply:", stSOLOToken.totalSupply());
+        logEth("Excluded amount:", stSOLOToken.calculateExcludedAmount());
         vm.stopPrank();
 
         // Now Bob's stake will be properly isolated from the rebasing mechanism
         console.log("\nAlice before rebase:");
-        console.log("Alice shares:", stSOLOToken.shareOf(alice));
-        console.log("Alice balance:", stSOLOToken.balanceOf(alice));
+        logEth("Alice shares:", stSOLOToken.shareOf(alice));
+        logEth("Alice balance:", stSOLOToken.balanceOf(alice));
         uint256 aliceBalanceBefore = stSOLOToken.balanceOf(alice);
 
         vm.warp(block.timestamp + 1 days);
         console.log("\nBefore rebase:");
-        console.log("Bob shares:", stSOLOToken.shareOf(bob));
-        console.log("Bob balance:", stSOLOToken.balanceOf(bob));
+        logEth("Bob shares:", stSOLOToken.shareOf(bob));
+        logEth("Bob balanc:", stSOLOToken.balanceOf(bob));
 
         uint256 rebaseAmount = stSOLOToken.rebase();
-        console.log("\n===========================================After rebase:");
-        console.log("Rebase amount:", rebaseAmount);
-        console.log("Bob shares:", stSOLOToken.shareOf(bob));
-        console.log("Bob balance:", stSOLOToken.balanceOf(bob));
+        logMajor("After rebase:");
+        logEth("Rebase amount:", rebaseAmount);
+        logEth("Bob shares:", stSOLOToken.shareOf(bob));
+        logEth("Bob balance:", stSOLOToken.balanceOf(bob));
         console.log("\nAlice after rebase:");
-        console.log("Alice shares:", stSOLOToken.shareOf(alice));
-        console.log("Alice balance:", stSOLOToken.balanceOf(alice));
-        console.log("Total shares:", stSOLOToken.totalShares());
-        console.log("Total supply:", stSOLOToken.totalSupply());
+        logEth("Alice shares:", stSOLOToken.shareOf(alice));
+        logEth("Alice balance:", stSOLOToken.balanceOf(alice));
+        logEth("Total shares:", stSOLOToken.totalShares());
+        logEth("Total supply:", stSOLOToken.totalSupply());
         uint256 aliceBalanceAfter = stSOLOToken.balanceOf(alice);
 
         // Add assertions for both accounts
         assertEq(stSOLOToken.balanceOf(bob), stakeAmount, "Bob's balance should remain fixed");
         assertTrue(aliceBalanceAfter > aliceBalanceBefore, "Alice's balance should increase after rebase");
-        console.log("Alice's balance increase:", aliceBalanceAfter - aliceBalanceBefore);    
+        logEth("Alice's balance increase:", aliceBalanceAfter - aliceBalanceBefore);    
         assertEq(stSOLOToken.balanceOf(bob), stakeAmount);
     }
 
@@ -119,63 +186,70 @@ contract SOLOStakingFailingTest is Test {
     * @dev Verifies that excluded addresses don't receive rebase rewards while others do
         */
     function test_ExcludeFromRebasePostExcluded() public {
-        console.log("\n==================test_ExcludeFromRebasePostExcluded==========================");
         uint256 stakeAmount = 100 * 10**18;
+        logHeader("test_ExcludeFromRebasePostExcluded");
 
-        // Stage 1: Initial Staking
+        // Log initial state
+        logEth("Initial total shares:", stSOLOToken.totalShares());
+        logEth("Initial total supply:", stSOLOToken.totalSupply());
+
+        // First, handle Alice's staking
         vm.startPrank(alice);
         soloToken.approve(address(stakingContract), stakeAmount);
         stakingContract.stake(stakeAmount, alice);
-        console.log("\nAfter Alice stakes:");
-        console.log("Alice initial shares:", stSOLOToken.shareOf(alice));
-        console.log("Alice initial balance:", stSOLOToken.balanceOf(alice));
+        logMinor("After Alice stakes:");
+        logEth("Alice shares:", stSOLOToken.shareOf(alice));
+        logEth("Alice balance:", stSOLOToken.balanceOf(alice));
+        logEth("Total shares:", stSOLOToken.totalShares());
+        logEth("Total supply:", stSOLOToken.totalSupply());
         vm.stopPrank();
 
+        // Then handle Bob's staking
         vm.startPrank(bob);
         soloToken.approve(address(stakingContract), stakeAmount);
         stakingContract.stake(stakeAmount, bob);
-        console.log("\nAfter Bob stakes:");
-        console.log("Bob initial shares:", stSOLOToken.shareOf(bob));
-        console.log("Bob initial balance:", stSOLOToken.balanceOf(bob));
+        logMinor("After Bob stakes:");
+        logEth("Bob shares:", stSOLOToken.shareOf(bob));
+        logEth("Bob balance:", stSOLOToken.balanceOf(bob));
+        logEth("Total shares:", stSOLOToken.totalShares());
+        logEth("Total supply:", stSOLOToken.totalSupply());
         vm.stopPrank();
 
-        // Stage 2: Pre-Exclusion State
-        console.log("\nPre-exclusion state:");
-        console.log("Total supply:", stSOLOToken.totalSupply());
-        console.log("Total shares:", stSOLOToken.totalShares());
-        uint256 aliceBalanceBeforeExclusion = stSOLOToken.balanceOf(alice);
-        uint256 bobBalanceBeforeExclusion = stSOLOToken.balanceOf(bob);
+        // Record initial balances before exclusion
+        uint256 aliceBalanceBefore = stSOLOToken.balanceOf(alice);
+        uint256 bobBalanceBefore = stSOLOToken.balanceOf(bob);
 
-        // Stage 3: Apply Exclusion
+        // Now exclude Bob after staking
         vm.prank(owner);
         stSOLOToken.setExcluded(bob, true);
-        console.log("\nPost-exclusion state:");
-        console.log("Is Bob excluded:", stSOLOToken.excludedFromRebase(bob));
-        console.log("Excluded amount:", stSOLOToken.calculateExcludedAmount());
+        logMinor("After Bob is excluded:");
+        logBool("Is Bob excluded:", stSOLOToken.excludedFromRebase(bob));
+        logEth("Excluded amount:", stSOLOToken.calculateExcludedAmount());
 
-        // Stage 4: First Rebase Period
-        vm.warp(block.timestamp + 365 days);
+        // Advance time and trigger rebase
+        vm.warp(block.timestamp + 1 days);
+        logMajor("Before rebase:");
+        logEth("Bob shares:", stSOLOToken.shareOf(bob));
+        logEth("Bob balance:", stSOLOToken.balanceOf(bob));
+
         uint256 rebaseAmount = stSOLOToken.rebase();
-        console.log("\nAfter first rebase:");
-        console.log("Rebase amount:", rebaseAmount);
+        logMajor("After rebase:");
+        logEth("Rebase amount:", rebaseAmount);
+        logEth("Bob shares:", stSOLOToken.shareOf(bob));
+        logEth("Bob balance:", stSOLOToken.balanceOf(bob));
+        logEth("Alice shares:", stSOLOToken.shareOf(alice));
+        logEth("Alice balance:", stSOLOToken.balanceOf(alice));
+        logEth("Total shares:", stSOLOToken.totalShares());
+        logEth("Total supply:", stSOLOToken.totalSupply());
 
-        // Stage 5: Final State Validation
-        console.log("\nFinal states:");
-        console.log("Alice final shares:", stSOLOToken.shareOf(alice));
-        console.log("Alice final balance:", stSOLOToken.balanceOf(alice));
-        console.log("Bob final shares:", stSOLOToken.shareOf(bob));
-        console.log("Bob final balance:", stSOLOToken.balanceOf(bob));
-        console.log("Total supply after rebase:", stSOLOToken.totalSupply());
-
-        // Stage 6: Assertions
-        assertEq(stSOLOToken.balanceOf(bob), stakeAmount, "Bob's balance should remain at stake amount");
-        assertTrue(
-            stSOLOToken.balanceOf(alice) > aliceBalanceBeforeExclusion,
-            "Alice's balance should increase after rebase"
-        );
-        console.log("Alice's balance increase:",
-                    stSOLOToken.balanceOf(alice) - aliceBalanceBeforeExclusion);
+        // Final assertions
+        assertEq(stSOLOToken.balanceOf(bob), bobBalanceBefore, "Bob's balance should remain fixed");
+        assertTrue(stSOLOToken.balanceOf(alice) > aliceBalanceBefore, "Alice's balance should increase after rebase");
+        logEth("Alice's balance increase:", stSOLOToken.balanceOf(alice) - aliceBalanceBefore);
     }
+    
+
+
 
     /**
         * @notice Tests the withdrawal request process

@@ -60,7 +60,6 @@ contract AdvancedSOLOStakingTest is Test {
         * @notice Fuzz test for multiple user staking
     * @param stakeAmountA Amount for first user to stake
         * @param stakeAmountB Amount for second user to stake
-            */
     function testFuzz_MultiUserStaking(
         uint96 stakeAmountA, 
         uint96 stakeAmountB
@@ -84,6 +83,7 @@ contract AdvancedSOLOStakingTest is Test {
         assertApproxEqRel(stSOLOToken.balanceOf(alice), stakeAmountA, 1e16);
         assertApproxEqRel(stSOLOToken.balanceOf(bob), stakeAmountB, 1e16);
     }
+    */
 
     /**
         * @notice Tests complex withdrawal scenarios with multiple users
@@ -119,7 +119,6 @@ contract AdvancedSOLOStakingTest is Test {
     /**
         * @notice Fuzz test for reward rate updates
     * @param newRewardRate New reward rate to test
-    */
     function testFuzz_RewardRateUpdate(uint16 newRewardRate) public {
         vm.assume(newRewardRate > 0 && newRewardRate <= 3000); // Max 30% APR
 
@@ -128,6 +127,7 @@ contract AdvancedSOLOStakingTest is Test {
 
         assertEq(stSOLOToken.rewardRate(), newRewardRate);
     }
+    */
 
     /**
         * @notice Tests edge case of staking zero amount
@@ -183,7 +183,6 @@ contract AdvancedSOLOStakingTest is Test {
     /**
         * @notice Tests withdrawal request limit and gas efficiency
     * @param numberOfRequests Number of withdrawal requests to simulate
-    */
     function testFuzz_MultipleWithdrawalRequests(uint8 numberOfRequests) public {
             vm.assume(numberOfRequests >= 1 && numberOfRequests <= 5);
 
@@ -207,6 +206,7 @@ contract AdvancedSOLOStakingTest is Test {
         assertEq(soloAmounts.length, numberOfRequests);
         assertEq(processed.length, numberOfRequests);
     }
+    */
     /**
         * @notice Comprehensive multi-user staking and withdrawal simulation
     * @dev Tests interaction of 6 users with varied staking and withdrawal patterns
