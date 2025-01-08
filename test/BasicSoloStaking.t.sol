@@ -6,12 +6,22 @@ import "../src/SOLOStaking.sol";
 import "../src/StSOLOToken.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
+/**
+ * @title Mock SOLO Token Contract
+ * @notice A simplified ERC20 token implementation for testing purposes
+ * @dev Initializes with 1M tokens minted to the deployer for testing scenarios
+ */
 contract MockSOLO is ERC20 {
     constructor() ERC20("SOLO Token", "SOLO") {
         _mint(msg.sender, 1000000 * 10**decimals());
     }
 }
 
+/**
+ * @title SOLO Staking Basic Test Suite
+ * @notice Core test suite for validating basic staking functionality and configuration
+ * @dev Implements fundamental test cases for staking, configuration updates, and parameter validation
+ */
 contract SOLOStakingTest is Test {
     SOLOStaking public stakingContract;
     StSOLOToken public stSOLOToken;
@@ -24,6 +34,15 @@ contract SOLOStakingTest is Test {
     uint256 public constant INITIAL_REWARD_RATE = 500; // 5% APR
     uint256 public constant INITIAL_WITHDRAWAL_DELAY = 7 days;
 
+    /**
+     * @notice Initializes the test environment with necessary contracts and test accounts
+     * @dev Sets up staking contract, tokens, and initial test state including:
+     *      - Deploying mock SOLO token
+     *      - Deploying stSOLO token with 5% initial reward rate
+     *      - Configuring staking contract with 7-day withdrawal delay
+     *      - Distributing initial tokens to test accounts
+     *      - Performing initial stake to establish baseline state
+     */
     function setUp() public {
         owner = address(this);
         alice = makeAddr("alice");
