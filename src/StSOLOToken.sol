@@ -39,6 +39,9 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     address public constant DEAD_ADDRESS = address(0x000000000000000000000000000000000000dEaD);
     uint256 private _totalNormalShares;
     uint256 private _totalExcludedShares;
+    uint256 private _tokenPerShare; // Tracks accumulated rewards per share
+    uint256 private constant PRECISION_FACTOR = 1e18; // For decimal handling
+
     /**
      * @notice Ensures only the staking contract can call the function
      * @dev Modifier to restrict certain functions to the staking contract
@@ -62,16 +65,21 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @param _initialRewardRate Initial annual reward rate in basis points
      */
     constructor(uint256 _initialRewardRate) ERC20("Staked SOLO", "stSOLO") Ownable(msg.sender) {
-            rewardRate = _initialRewardRate;
-            lastRebaseTime = block.timestamp;
+        rewardRate = _initialRewardRate;
+        lastRebaseTime = block.timestamp;
         rebaseInterval = 1 days;
 
-        // Initialize with minimal amount to establish share ratio
-        uint256 INITIAL_AMOUNT = 10**18; 
+        // Initialize tokenPerShare at PRECISION_FACTOR for 1:1 initial ratio
+        _tokenPerShare = PRECISION_FACTOR;
+
+        // Initial mint with 1:1 ratio
+        //uint256 INITIAL_AMOUNT = 1e18;
+        uint256 INITIAL_AMOUNT = 1157920892373161954235709850086879078532699846655; 
         _mint(msg.sender, INITIAL_AMOUNT);
         _shares[msg.sender] = INITIAL_AMOUNT;
         _totalShares = INITIAL_AMOUNT;
-        }
+        _totalNormalShares = INITIAL_AMOUNT; // Don't forget to initialize this
+    }
 
 
     function setRebaseInterval(uint256 _newInterval) external onlyOwner {
@@ -169,19 +177,25 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @param share Number of shares to convert
      * @return Equivalent token amount
      */
-function _shareToAmount(uint256 share) internal view returns (uint256) {
-    if (_totalShares == 0) return share;  
-    return (share * totalSupply()) / _totalShares;
-}
+     function _shareToAmount(uint256 share) internal view returns (uint256) {
+        if (_totalShares == 0) return share;
+        if (excludedFromRebase[msg.sender]) {
+            return share;
+        }
+        return (share * _tokenPerShare) / PRECISION_FACTOR;
+    }
 
     /**
      * @notice Converts token amount to shares
      * @param amount Token amount to convert
      * @return Equivalent number of shares
      */
-    function _amountToShare(uint256 amount) internal view returns (uint256) {
+     function _amountToShare(uint256 amount) internal view returns (uint256) {
         if (_totalShares == 0) return amount;
-        return (amount * _totalShares) / totalSupply();
+        if (excludedFromRebase[msg.sender]) {
+            return amount;
+        }
+        return (amount * PRECISION_FACTOR) / _tokenPerShare;
     }
 
     /**
@@ -202,12 +216,13 @@ function _shareToAmount(uint256 share) internal view returns (uint256) {
             return 0;
         }
 
-        // Improved precision handling
+        // Calculate rebase amount as before
         uint256 timeElapsed = block.timestamp - lastRebaseTime;
         uint256 rebaseAmount = (rebasableSupply * timeElapsed * rewardRate) / (SECONDS_PER_YEAR * 10000);
 
         if (rebaseAmount > 0) {
-            _mint(DEAD_ADDRESS, rebaseAmount);
+            // Instead of minting, update tokenPerShare
+            _tokenPerShare += (rebaseAmount * PRECISION_FACTOR) / _totalNormalShares;
             lastRebaseTime = block.timestamp;
         }
 
@@ -289,9 +304,10 @@ function _update(address from, address to, uint256 amount) internal virtual over
      */
     function balanceOf(address account) public view override returns (uint256) {
         if (excludedFromRebase[account]) {
-            return _shares[account]; // For excluded accounts, return shares directly
+            return _shares[account]; // Excluded accounts still work the same
         }
-        return _shareToAmount(_shares[account]); // Normal conversion for others
+        // For normal accounts, multiply their shares by tokenPerShare
+        return (_shares[account] * _tokenPerShare) / PRECISION_FACTOR;
     }
 
     /**
