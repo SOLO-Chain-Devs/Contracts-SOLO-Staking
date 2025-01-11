@@ -571,7 +571,7 @@ function test_YieldCalculationSingleFuzz(uint96 _daysToPass, uint96 _rawAmount) 
         vm.stopPrank();
 
         assertApproxEqRel(stSOLOToken.balanceOf(alice), stakeAmount, 1e16); // Allow 1% deviation
-        assertEq(soloToken.balanceOf(address(stakingContract)), stakeAmount + 1); // +1 from setup
+        assertEq(soloToken.balanceOf(address(stakingContract)), stakeAmount + 1 ether); // +1 from setup
     }
 
     /**
@@ -587,7 +587,7 @@ function test_YieldCalculationSingleFuzz(uint96 _daysToPass, uint96 _rawAmount) 
         vm.stopPrank();
 
         assertApproxEqRel(stSOLOToken.balanceOf(bob), stakeAmount, 1e16);
-        assertEq(soloToken.balanceOf(address(stakingContract)), stakeAmount + 1);
+        assertEq(soloToken.balanceOf(address(stakingContract)), stakeAmount + 1 ether);
     }
 
     event Staked(address indexed staker, address indexed recipient, uint256 amount);
