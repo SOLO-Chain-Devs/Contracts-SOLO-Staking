@@ -127,6 +127,7 @@ contract SOLOStakingTest is Test {
     function test_UpdateRewardRate() public {
         uint256 newRate = 1000; // 10% APR
         vm.prank(owner);
+        vm.warp(block.timestamp + 1 days); // need to warp 1 day so that rebase can occur
         stSOLOToken.setRewardRate(newRate);
         assertEq(stSOLOToken.rewardRate(), newRate);
     }

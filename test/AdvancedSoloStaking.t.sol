@@ -590,6 +590,47 @@ function test_YieldCalculationSingleFuzz(uint96 _daysToPass, uint96 _rawAmount) 
         assertEq(soloToken.balanceOf(address(stakingContract)), stakeAmount + 1 ether);
     }
 
+
+    function test_ProcessWithdrawalTwo() public {
+    // Setup: stake and request withdrawal
+        uint256 stakeAmount = 100 * 10**18;
+
+        vm.startPrank(alice);
+
+        // Record initial SOLO balance
+        uint256 initialSoloBalance = soloToken.balanceOf(alice);
+
+        // Perform staking
+        soloToken.approve(address(stakingContract), stakeAmount);
+        stakingContract.stake(stakeAmount, alice);
+
+        // Record stSOLO balance after staking
+        uint256 stSOLOBalance = stSOLOToken.balanceOf(alice);
+
+        // Request withdrawal using stSOLO balance instead of fixed amount
+        stSOLOToken.approve(address(stakingContract), stSOLOBalance);
+        stakingContract.requestWithdrawal(stSOLOBalance);
+
+        // Wait for withdrawal delay
+        vm.warp(block.timestamp + stakingContract.withdrawalDelay() + 1);
+
+        vm.expectEmit(true, false, false, true, address(stakingContract));
+        emit WithdrawalProcessed(alice, stakeAmount, 0);
+
+        // Process withdrawal
+        stakingContract.processWithdrawal(0);
+
+        // Verify final SOLO balance
+        uint256 finalSoloBalance = soloToken.balanceOf(alice);
+        assertEq(finalSoloBalance, initialSoloBalance, "Should receive back original SOLO amount");
+
+        // Verify withdrawal was processed
+        (,,,bool[] memory processed) = stakingContract.getPendingWithdrawals(alice);
+        assertTrue(processed[0], "Withdrawal should be marked as processed");
+
+        vm.stopPrank();
+    }
+
     event Staked(address indexed staker, address indexed recipient, uint256 amount);
     event WithdrawalRequested(address indexed user, uint256 stSOLOAmount, uint256 soloAmount, uint256 requestId);
     event WithdrawalProcessed(address indexed user, uint256 soloAmount, uint256 requestId);
