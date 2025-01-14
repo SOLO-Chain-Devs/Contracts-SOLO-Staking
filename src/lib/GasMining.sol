@@ -2,6 +2,8 @@ pragma solidity ^0.8.16;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "forge-std/Test.sol";
+
 
 /* 
  * @title GasMining
@@ -187,6 +189,7 @@ contract GasMining is Ownable {
         UserClaim storage claim = userClaims[msg.sender];
         require(claim.lastClaimedBlock < latestClaimableBlock, "No new rewards to claim");
         require(claim.pendingClaimAmount > 0, "No pending rewards to claim for the user");
+       // console.log("stakeClaim amount", claim.pendingClaimAmount);
         
         uint256 reward = claim.pendingClaimAmount;
         claim.pendingClaimAmount = 0;
@@ -195,7 +198,7 @@ contract GasMining is Ownable {
         // First approve the contract to spend the tokens
         
         // Call stake function on the staking contract with msg.sender as the user
-        ISOLOStaking(_stakingContract).stake(msg.sender, reward);
+        ISOLOStaking(_stakingContract).stake(reward,msg.sender);
         
         emit RewardStaked(msg.sender, _stakingContract, reward);
 
@@ -309,6 +312,6 @@ contract GasMining is Ownable {
 }
 
 interface ISOLOStaking {
-    function stake(address _user, uint256 _amount) external;
+    function stake(uint256 _amount,address _user) external;
 }
 
