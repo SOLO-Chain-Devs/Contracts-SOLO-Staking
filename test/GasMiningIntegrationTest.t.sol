@@ -240,14 +240,17 @@ contract GasMiningIntegrationTest is Test {
         vm.stopPrank();
 
         // Have Alice claim once to set lastClaimedBlock
-        vm.startPrank(alice);
+        vm.prank(alice);
         gasMining.stakeClaim(address(stakingContract));
 
         // Now set latest claimable to same as last claimed
-        vm.prank(owner);
-        gasMining.updateLatestClaimableBlock(5); // This should now equal lastClaimedBlock
+        /* Cannot set the same block*/
+         /*vm.prank(owner);
+        vm.expectRevert("New block number must be greater than the current latest claimable block");
+        gasMining.updateLatestClaimableBlock(5);  */ // This should now equal lastClaimedBlock
 
         // Try to claim again - should revert with no new rewards
+        vm.startPrank(alice);
         vm.expectRevert("No new rewards to claim");
         gasMining.stakeClaim(address(stakingContract));
         vm.stopPrank();
