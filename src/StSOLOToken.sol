@@ -205,7 +205,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @dev Distributes rewards to non-excluded token holders
      * @return Amount of tokens minted in the rebase
      */
-    function rebase() external nonReentrant returns (uint256) {
+    function rebase() public nonReentrant returns (uint256) {
         require(msg.sender == stakingContract || msg.sender == owner(), "Unauthorized");
         require(block.timestamp >= lastRebaseTime + rebaseInterval, "Too soon to rebase");
         
@@ -248,7 +248,7 @@ function _update(address from, address to, uint256 amount) internal virtual over
     }
     
     if (from != address(0)) {
-        require(shareAmount <= _shares[from], "Insufficient shares");
+        require(shareAmount <= _shares[from], "Insufficient shares during update");
         _shares[from] -= shareAmount;
         if (!excludedFromRebase[from]) {
             _totalNormalShares -= shareAmount;
@@ -296,7 +296,7 @@ function _update(address from, address to, uint256 amount) internal virtual over
         _burn(account, amount);
         
         emit Burned(account, amount, shareAmount);
-    }    
+    }        
 
     /**
      * @notice Returns token balance of an account
@@ -319,6 +319,7 @@ function _update(address from, address to, uint256 amount) internal virtual over
      */
     function setRewardRate(uint256 _newRate) external onlyOwner {
         require(_newRate <= 3000, "Rate too high"); // Max 30% APR
+        rebase();
         emit RewardRateUpdated(rewardRate, _newRate);
         rewardRate = _newRate;
     }
