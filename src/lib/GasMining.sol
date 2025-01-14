@@ -189,7 +189,7 @@ contract GasMining is Ownable {
         UserClaim storage claim = userClaims[msg.sender];
         require(claim.lastClaimedBlock < latestClaimableBlock, "No new rewards to claim");
         require(claim.pendingClaimAmount > 0, "No pending rewards to claim for the user");
-        console.log("stakeClaim amount", claim.pendingClaimAmount);
+       // console.log("stakeClaim amount", claim.pendingClaimAmount);
         
         uint256 reward = claim.pendingClaimAmount;
         claim.pendingClaimAmount = 0;
