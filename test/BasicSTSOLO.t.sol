@@ -12,228 +12,263 @@ contract MockSOLO is ERC20 {
     }
 }
 
+/**
+ * @title Basic StSOLO Test Contract
+ * @notice Test contract for StSOLO staking functionality with flexible parameters
+ * @dev Contains tests for staking, rewards, and withdrawals with configurable APR and time periods
+ */
 contract BasicStSOLO is Test {
+    // Contract instances
     SOLOStaking public stakingContract;
     StSOLOToken public stSOLOToken;
     MockSOLO public soloToken;
 
+    // Test accounts
     address public owner;
     address public alice;
     address public bob;
     address public charlie;
+
+    // Configuration constants
     uint256 public constant INITIAL_AMOUNT = 1000 * 10 ** 18;
-    uint256 public constant INITIAL_REWARD_RATE = 1000; // 10% APR
-    uint256 public constant INITIAL_WITHDRAWAL_DELAY = 7 days;
+    uint256 public rewardRate; // APR in basis points (100 = 1%)
+    uint256 public withdrawalDelay;
+    uint256 public constant SECONDS_PER_YEAR = 31536000;
+    uint256 public constant PRECISION = 0.001 ether; // Tolerance for approximate equality checks
+
+    // Test parameters
+    uint256 public baseStakeAmount;
+    uint256 public largeStakeAmount;
 
     function setUp() public {
+        // Initialize accounts
         owner = address(this);
         alice = makeAddr("alice");
         bob = makeAddr("bob");
         charlie = makeAddr("charlie");
 
+        // Set configurable parameters
+        rewardRate = 100000; // 10% APR by default
+        withdrawalDelay = 7 days;
+        baseStakeAmount = 100 ether;
+        largeStakeAmount = 500 ether;
+
+        // Deploy contracts
         soloToken = new MockSOLO();
-        stSOLOToken = new StSOLOToken(INITIAL_REWARD_RATE);
+        stSOLOToken = new StSOLOToken(rewardRate);
         stakingContract = new SOLOStaking(
             address(soloToken),
             address(stSOLOToken),
-            INITIAL_WITHDRAWAL_DELAY
+            withdrawalDelay
         );
 
         stSOLOToken.setStakingContract(address(stakingContract));
 
+        // Initial token distribution
         soloToken.transfer(alice, INITIAL_AMOUNT);
         soloToken.transfer(bob, INITIAL_AMOUNT);
         soloToken.transfer(charlie, INITIAL_AMOUNT);
     }
 
-    function test_Alice_Gets_Correct_APY() public {
-        // Alice Stakes 100 tokens
-        uint amountToStake = 100 ether;
-        vm.startPrank(alice);
-        soloToken.approve(address(stakingContract), amountToStake);
-        stakingContract.stake(amountToStake, alice);
-        vm.stopPrank();
-        vm.assertEq(stSOLOToken.balanceOf(alice), amountToStake);
+    /**
+     * @notice Tests if a user receives correct APY after one year
+     * @dev Verifies that staking rewards are calculated correctly based on the reward rate
+     */
+    function test_User_Gets_Correct_APY() public {
+        // Calculate expected balance after one year
+        uint256 expectedBalance = baseStakeAmount + (baseStakeAmount * rewardRate / 10000);
 
-        vm.warp(block.timestamp + 31536000);
+        vm.startPrank(alice);
+        soloToken.approve(address(stakingContract), baseStakeAmount);
+        stakingContract.stake(baseStakeAmount, alice);
+        vm.stopPrank();
+        
+        vm.warp(block.timestamp + SECONDS_PER_YEAR);
         vm.prank(owner);
         stSOLOToken.rebase();
 
         vm.assertApproxEqAbs(
             stSOLOToken.balanceOf(alice),
-            110 ether,
-            0.001 ether, // Tolerance of 0.0001 ether
-            "Alice's balance is not approximately 110 ether"
+            expectedBalance,
+            PRECISION,
+            "Incorrect rewards after one year"
         );
     }
-    function test_Same_Amounts_APY() public {
-        // Alice and Bob Stake Same Amouunt
-        uint amountToStake = 100 ether;
+
+    /**
+     * @notice Tests if users staking same amounts receive equal rewards
+     * @dev Verifies fairness in reward distribution for equal stakes
+     */
+    function test_Equal_Stakes_Equal_Rewards() public {
+        // Calculate expected balance after one year
+        uint256 expectedBalance = baseStakeAmount + (baseStakeAmount * rewardRate / 10000);
 
         // Alice Stakes
         vm.startPrank(alice);
-        soloToken.approve(address(stakingContract), amountToStake);
-        stakingContract.stake(amountToStake, alice);
+        soloToken.approve(address(stakingContract), baseStakeAmount);
+        stakingContract.stake(baseStakeAmount, alice);
         vm.stopPrank();
-        vm.assertEq(stSOLOToken.balanceOf(alice), amountToStake);
 
         // Bob Stakes
         vm.startPrank(bob);
-        soloToken.approve(address(stakingContract), amountToStake);
-        stakingContract.stake(amountToStake, bob);
+        soloToken.approve(address(stakingContract), baseStakeAmount);
+        stakingContract.stake(baseStakeAmount, bob);
         vm.stopPrank();
-        vm.assertEq(stSOLOToken.balanceOf(bob), amountToStake);
 
-        vm.warp(block.timestamp + 31536000);
+        vm.warp(block.timestamp + SECONDS_PER_YEAR);
         vm.prank(owner);
         stSOLOToken.rebase();
 
         vm.assertApproxEqAbs(
             stSOLOToken.balanceOf(alice),
-            110 ether,
-            0.001 ether, // Tolerance of 0.0001 ether
-            "Alice's balance is not approximately 110 ether"
+            expectedBalance,
+            PRECISION,
+            "Alice's balance incorrect"
         );
         vm.assertApproxEqAbs(
             stSOLOToken.balanceOf(bob),
-            110 ether,
-            0.001 ether, // Tolerance of 0.0001 ether
-            "Bob's balance is not approximately 110 ether"
+            expectedBalance,
+            PRECISION,
+            "Bob's balance incorrect"
         );
     }
 
-    function test_Different_Amounts_APY() public {
-        // Alice and Bob Stake Diffrent Amouunt
+    /**
+     * @notice Tests if rewards are proportional for different stake amounts
+     * @dev Verifies that larger stakes receive proportionally larger rewards
+     */
+    function test_Proportional_Rewards() public {
+        // Calculate expected balances
+        uint256 expectedSmallBalance = baseStakeAmount + (baseStakeAmount * rewardRate / 10000);
+        uint256 expectedLargeBalance = largeStakeAmount + (largeStakeAmount * rewardRate / 10000);
 
-        // Alice Stakes
+        // Alice stakes base amount
         vm.startPrank(alice);
-        soloToken.approve(address(stakingContract), 100 ether);
-        stakingContract.stake(100 ether, alice);
+        soloToken.approve(address(stakingContract), baseStakeAmount);
+        stakingContract.stake(baseStakeAmount, alice);
         vm.stopPrank();
-        vm.assertEq(stSOLOToken.balanceOf(alice), 100 ether);
 
-        // Bob Stakes
+        // Bob stakes large amount
         vm.startPrank(bob);
-        soloToken.approve(address(stakingContract), 500 ether);
-        stakingContract.stake(500 ether, bob);
+        soloToken.approve(address(stakingContract), largeStakeAmount);
+        stakingContract.stake(largeStakeAmount, bob);
         vm.stopPrank();
-        vm.assertEq(stSOLOToken.balanceOf(bob), 500 ether);
 
-        vm.warp(block.timestamp + 31536000);
+        vm.warp(block.timestamp + SECONDS_PER_YEAR);
         vm.prank(owner);
         stSOLOToken.rebase();
 
         vm.assertApproxEqAbs(
             stSOLOToken.balanceOf(alice),
-            110 ether,
-            0.001 ether, // Tolerance of 0.0001 ether
-            "Alice's balance is not approximately 110 ether"
+            expectedSmallBalance,
+            PRECISION,
+            "Small stake rewards incorrect"
         );
         vm.assertApproxEqAbs(
             stSOLOToken.balanceOf(bob),
-            550 ether,
-            0.001 ether, // Tolerance of 0.0001 ether
-            "Bob's balance is not approximately 110 ether"
+            expectedLargeBalance,
+            PRECISION,
+            "Large stake rewards incorrect"
         );
     }
 
+    /**
+     * @notice Tests staggered staking with multiple rebase periods
+     * @dev Verifies correct reward calculation for different staking entry points
+     */
+    function test_Staggered_Staking_Rebase() public {
+
+        vm.startPrank(alice);
+        soloToken.approve(address(stakingContract), baseStakeAmount);
+        stakingContract.stake(baseStakeAmount, alice);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 7 days);
+        vm.prank(owner);
+        stSOLOToken.rebase();
+
+        uint256 updatedTokenPerShare = stSOLOToken.getTokenPerShare();
+        uint256 aliceExpectedBalance = calculateExpectedBalance(
+            baseStakeAmount,
+            updatedTokenPerShare
+        );
+
+        vm.assertApproxEqAbs(
+            stSOLOToken.balanceOf(alice),
+            aliceExpectedBalance,
+            PRECISION,
+            "Incorrect balance after staggered staking"
+        );
+    }
+
+    /**
+     * @notice Tests withdrawal process during rebase periods
+     * @dev Verifies correct balance calculations during partial withdrawals
+     */
+    function test_Withdrawal_During_Rebase() public {
+        uint256 withdrawalAmount = baseStakeAmount / 2;
+
+        // Initial stakes
+        vm.startPrank(alice);
+        soloToken.approve(address(stakingContract), baseStakeAmount);
+        stakingContract.stake(baseStakeAmount, alice);
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+        soloToken.approve(address(stakingContract), baseStakeAmount);
+        stakingContract.stake(baseStakeAmount, bob);
+        vm.stopPrank();
+
+        // First rebase
+        vm.warp(block.timestamp + 7 days);
+        vm.prank(owner);
+        stSOLOToken.rebase();
+
+        // Bob requests withdrawal
+        vm.startPrank(bob);
+        stSOLOToken.approve(address(stakingContract), withdrawalAmount);
+        stakingContract.requestWithdrawal(withdrawalAmount);
+        vm.stopPrank();
+
+        // Second rebase
+        vm.warp(block.timestamp + 7 days);
+        vm.prank(owner);
+        stSOLOToken.rebase();
+
+        // Validate final balances
+        uint256 tokenPerShareAfterSecondRebase = stSOLOToken.getTokenPerShare();
+        uint256 aliceExpectedBalance = calculateExpectedBalance(
+            baseStakeAmount,
+            tokenPerShareAfterSecondRebase
+        );
+
+        uint256 remainingSharesBob = stSOLOToken.shareOf(bob);
+        uint256 bobExpectedBalance = (remainingSharesBob * tokenPerShareAfterSecondRebase) / 1e18;
+
+        vm.assertApproxEqAbs(
+            stSOLOToken.balanceOf(alice),
+            aliceExpectedBalance,
+            PRECISION,
+            "Alice's final balance incorrect"
+        );
+        vm.assertApproxEqAbs(
+            stSOLOToken.balanceOf(bob),
+            bobExpectedBalance,
+            PRECISION,
+            "Bob's final balance incorrect"
+        );
+    }
+
+    /**
+     * @notice Helper function to calculate expected balance based on shares
+     * @param initialStake Initial amount staked
+     * @param tokenPerShare Current token per share ratio
+     * @return Expected balance after applying share ratio
+     */
     function calculateExpectedBalance(
         uint256 initialStake,
         uint256 tokenPerShare
     ) internal pure returns (uint256) {
         return (initialStake * tokenPerShare) / 1e18;
-    }
-
-    function test_Staggered_Staking_Rebase() public {
-        uint256 amountToStakeA = 100 ether;
-
-        // Step 1: Alice stakes
-        vm.startPrank(alice);
-        soloToken.approve(address(stakingContract), amountToStakeA);
-        stakingContract.stake(amountToStakeA, alice);
-        vm.stopPrank();
-
-        // Advance 1 week and rebase
-        vm.warp(block.timestamp + 7 days);
-        vm.prank(owner);
-        stSOLOToken.rebase();
-
-        // Capture updated _tokenPerShare
-        uint256 updatedTokenPerShare = stSOLOToken.getTokenPerShare();
-
-        // Calculate expected balance for Alice
-        uint256 aliceExpectedBalance = calculateExpectedBalance(
-            amountToStakeA,
-            updatedTokenPerShare
-        );
-
-        // Assert Alice's balance matches the expected balance
-        vm.assertApproxEqAbs(
-            stSOLOToken.balanceOf(alice),
-            aliceExpectedBalance,
-            0.003 ether,
-            "Alice's balance is incorrect after first rebase"
-        );
-    }
-
-    function test_Withdrawal_During_Rebase() public {
-        uint256 amountToStakeA = 100 ether;
-        uint256 amountToStakeB = 50 ether;
-
-        // Step 1: Alice stakes
-        vm.startPrank(alice);
-        soloToken.approve(address(stakingContract), amountToStakeA);
-        stakingContract.stake(amountToStakeA, alice);
-        vm.stopPrank();
-
-        // Step 2: Bob stakes
-        vm.startPrank(bob);
-        soloToken.approve(address(stakingContract), amountToStakeB);
-        stakingContract.stake(amountToStakeB, bob);
-        vm.stopPrank();
-
-        // Step 3: Advance 1 week and rebase
-        vm.warp(block.timestamp + 7 days);
-        vm.prank(owner);
-        stSOLOToken.rebase();
-
-        // Step 4: Bob requests partial withdrawal
-        vm.startPrank(bob);
-        uint256 withdrawalAmount = 25 ether;
-        stSOLOToken.approve(address(stakingContract), withdrawalAmount);
-        stakingContract.requestWithdrawal(withdrawalAmount);
-        vm.stopPrank();
-
-        // Step 5: Advance another week and rebase
-        vm.warp(block.timestamp + 7 days);
-        vm.prank(owner);
-        stSOLOToken.rebase();
-
-        // Step 6: Validate balances
-        uint256 tokenPerShareAfterSecondRebase = stSOLOToken.getTokenPerShare();
-        uint256 aliceExpectedBalanceAfterSecondRebase = calculateExpectedBalance(
-                amountToStakeA,
-                tokenPerShareAfterSecondRebase
-            );
-
-        uint256 remainingSharesBob = stSOLOToken.shareOf(bob);
-        // Calculate Bob's balance after second rebase
-        uint256 bobExpectedBalanceAfterSecondRebase = (remainingSharesBob *
-            stSOLOToken.getTokenPerShare()) / 1e18;
-       
-
-        vm.assertApproxEqAbs(
-            stSOLOToken.balanceOf(alice),
-            aliceExpectedBalanceAfterSecondRebase,
-            0.003 ether,
-            "Alice's balance is incorrect after second rebase"
-        );
-        // Assert balances
-        vm.assertApproxEqAbs(
-            stSOLOToken.balanceOf(bob),
-            bobExpectedBalanceAfterSecondRebase,
-            0.003 ether,
-            "Bob's balance is incorrect after second rebase"
-        );
     }
 }
