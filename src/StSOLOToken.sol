@@ -61,6 +61,9 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     event Minted(address indexed account, uint256 amount, uint256 shares);
     event Burned(address indexed account, uint256 amount, uint256 shares);
     event RebaseIntervalUpdated(uint256 interval);
+    //TODO delete this
+    event Debug_BurnAttempt(address account, uint256 attemptedBurn, uint256 actualShares);
+
     /**
      * @notice Contract constructor
      * @dev Initializes the contract with an initial reward rate
@@ -83,6 +86,14 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         _totalNormalShares = INITIAL_AMOUNT; // Don't forget to initialize this
     }
 
+    //TODO might need to remove these getter functions. Written for tests
+    function getTokenPerShare() public view returns (uint256) {
+        return _tokenPerShare;
+    }
+
+    function getTotalNormalShares() public view returns (uint256) {
+        return _totalNormalShares;
+    }
 
     function setRebaseInterval(uint256 _newInterval) external onlyOwner {
         require(_newInterval >= MIN_REBASE_INTERVAL, "Interval too short");
@@ -179,7 +190,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @param share Number of shares to convert
      * @return Equivalent token amount
      */
-     function _shareToAmount(uint256 share) internal view returns (uint256) {
+     function _shareToAmount(uint256 share) public view returns (uint256) {
         if (_totalShares == 0) return share;
         if (excludedFromRebase[msg.sender]) {
             return share;
@@ -192,7 +203,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @param amount Token amount to convert
      * @return Equivalent number of shares
      */
-     function _amountToShare(uint256 amount) internal view returns (uint256) {
+     function _amountToShare(uint256 amount) public view returns (uint256) {
         if (_totalShares == 0) return amount;
         if (excludedFromRebase[msg.sender]) {
             return amount;
@@ -240,6 +251,11 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @param amount Amount of tokens transferred
      */
 function _update(address from, address to, uint256 amount) internal virtual override {
+    if (to == address(0)) {
+        super._update(from, to, amount);
+        return;
+    }
+
     uint256 shareAmount;
     if (excludedFromRebase[to] || excludedFromRebase[from]) {
         shareAmount = amount;
@@ -288,6 +304,7 @@ function _update(address from, address to, uint256 amount) internal virtual over
      * @param amount Amount of tokens to burn
      */
     function burn(address account, uint256 amount) external onlyStakingContract nonReentrant {
+         emit Debug_BurnAttempt(account, amount, _shares[account]);
         uint256 shareAmount = _amountToShare(amount);
         require(shareAmount <= _shares[account], "Insufficient shares");
         

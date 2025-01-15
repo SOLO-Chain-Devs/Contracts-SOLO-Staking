@@ -132,9 +132,10 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
 
         // Transfer and burn stSOLO tokens immediately
         // TODO not sure if there is a use to keep SOLO in supply and only burn later
-        require(stSOLOToken.transferFrom(msg.sender, address(this), stSOLOAmount),
-                "stSOLO transfer failed");
-        stSOLOToken.burn(address(this), stSOLOAmount);
+        // Commenting this out because I was insane when I wrote this. WTF ?
+        //require(stSOLOToken.transferFrom(msg.sender, address(this), stSOLOAmount),"stSOLO transfer failed");
+        //stSOLOToken.burn(address(this), stSOLOAmount);
+        stSOLOToken.burn(msg.sender, stSOLOAmount);
 
         emit WithdrawalRequested(msg.sender, stSOLOAmount, soloAmount, requestId);
     }
