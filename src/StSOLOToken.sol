@@ -217,6 +217,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @return Amount of tokens minted in the rebase
      */
     function rebase() public nonReentrant returns (uint256) {
+       
         require(msg.sender == stakingContract || msg.sender == owner(), "Unauthorized");
         require(block.timestamp >= lastRebaseTime + rebaseInterval, "Too soon to rebase");
         
@@ -232,6 +233,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         // Calculate rebase amount as before
         uint256 timeElapsed = block.timestamp - lastRebaseTime;
         uint256 rebaseAmount = (rebasableSupply * timeElapsed * rewardRate) / (SECONDS_PER_YEAR * 10000);
+       
 
         if (rebaseAmount > 0) {
             // Instead of minting, update tokenPerShare
