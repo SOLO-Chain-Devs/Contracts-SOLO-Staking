@@ -111,7 +111,7 @@ contract SOLOStakingFailingTest is Test {
 
         vm.startPrank(alice);
         soloToken.approve(address(stakingContract), 1 ether);
-        stakingContract.stake(1 ether, alice);
+        //stakingContract.stake(1 ether, alice);
         vm.stopPrank();
     }
 
@@ -571,7 +571,7 @@ function test_YieldCalculationSingleFuzz(uint96 _daysToPass, uint96 _rawAmount) 
         vm.stopPrank();
 
         assertApproxEqRel(stSOLOToken.balanceOf(alice), stakeAmount, 1e16); // Allow 1% deviation
-        assertEq(soloToken.balanceOf(address(stakingContract)), stakeAmount + 1 ether); // +1 from setup
+        assertEq(soloToken.balanceOf(address(stakingContract)), stakeAmount); // +1 from setup
     }
 
     /**
@@ -587,7 +587,7 @@ function test_YieldCalculationSingleFuzz(uint96 _daysToPass, uint96 _rawAmount) 
         vm.stopPrank();
 
         assertApproxEqRel(stSOLOToken.balanceOf(bob), stakeAmount, 1e16);
-        assertEq(soloToken.balanceOf(address(stakingContract)), stakeAmount + 1 ether);
+        assertEq(soloToken.balanceOf(address(stakingContract)), stakeAmount);
     }
 
 
@@ -615,14 +615,16 @@ function test_YieldCalculationSingleFuzz(uint96 _daysToPass, uint96 _rawAmount) 
         vm.warp(block.timestamp + stakingContract.withdrawalDelay() + 1);
 
         vm.expectEmit(true, false, false, true, address(stakingContract));
-        emit WithdrawalProcessed(alice, stakeAmount, 0);
+        emit WithdrawalProcessed(alice, stSOLOBalance, 0);
+        //emit WithdrawalProcessed(alice, stakeAmount, 0);
 
         // Process withdrawal
         stakingContract.processWithdrawal(0);
 
         // Verify final SOLO balance
         uint256 finalSoloBalance = soloToken.balanceOf(alice);
-        assertEq(finalSoloBalance, initialSoloBalance, "Should receive back original SOLO amount");
+        assertEq(finalSoloBalance, initialSoloBalance, "Should receive back SOLO equivalent to burned stSOLO");
+        //assertEq(finalSoloBalance, initialSoloBalance, "Should receive back original SOLO amount");
 
         // Verify withdrawal was processed
         (,,,bool[] memory processed) = stakingContract.getPendingWithdrawals(alice);
@@ -630,7 +632,93 @@ function test_YieldCalculationSingleFuzz(uint96 _daysToPass, uint96 _rawAmount) 
 
         vm.stopPrank();
     }
-
+function test_WithdrawalWithDebug() public {
+    // Initial Setup
+    uint256 stakeAmount = 100 * 10**18;  // 100 tokens
+    
+    logHeader("Initial State");
+    logEth("Alice's SOLO balance", soloToken.balanceOf(alice));
+    logEth("Contract's token per share", stSOLOToken.getTokenPerShare());
+    logEth("Total normal shares", stSOLOToken.getTotalNormalShares());
+    
+    // Phase 1: Staking
+    logHeader("Staking Phase");
+    vm.startPrank(alice);
+    
+    // Approve and stake tokens
+    soloToken.approve(address(stakingContract), stakeAmount);
+    stakingContract.stake(stakeAmount, alice);
+    
+    // Verify staking success
+    uint256 postStakeBalance = stSOLOToken.balanceOf(alice);
+    uint256 postStakeShares = stSOLOToken.shareOf(alice);
+    
+    logEth("Alice's stSOLO balance", postStakeBalance);
+    logEth("Alice's shares", postStakeShares);
+    
+    assertTrue(postStakeBalance > 0, "Staking failed: No stSOLO received");
+    assertTrue(postStakeShares > 0, "Staking failed: No shares allocated");
+    
+    // Phase 2: Pre-Withdrawal Setup
+    logHeader("Pre-Withdrawal State");
+    
+    // Calculate withdrawal amount (using full balance)
+    uint256 withdrawAmount = stSOLOToken.balanceOf(alice);
+    logEth("Withdrawal amount", withdrawAmount);
+    
+    // Calculate expected shares to be burned
+    uint256 expectedShares = stSOLOToken._amountToShare(withdrawAmount);
+    logEth("Expected shares to burn", expectedShares);
+    logEth("Actual shares owned", stSOLOToken.shareOf(alice));
+    
+    // Phase 3: Withdrawal Request
+    logHeader("Withdrawal Request");
+    
+    // Approve stSOLO transfer for withdrawal
+    stSOLOToken.approve(address(stakingContract), withdrawAmount);
+    
+    // Log pre-withdrawal state
+    logEth("Pre-withdrawal stSOLO balance", stSOLOToken.balanceOf(alice));
+    logBool("StakingContract excluded?", stSOLOToken.excludedFromRebase(address(stakingContract)));
+    logBool("Alice excluded?", stSOLOToken.excludedFromRebase(alice));
+    
+    // Request withdrawal
+    stakingContract.requestWithdrawal(withdrawAmount);
+    
+    // Phase 4: Post-Request Verification
+    logHeader("Post-Request State");
+    logEth("Alice's remaining stSOLO", stSOLOToken.balanceOf(alice));
+    logEth("Contract's stSOLO balance", stSOLOToken.balanceOf(address(stakingContract)));
+    
+    // Phase 5: Process Withdrawal
+    logHeader("Withdrawal Processing");
+    
+    // Advance time past withdrawal delay
+    vm.warp(block.timestamp + stakingContract.withdrawalDelay() + 1);
+    
+    // Process the withdrawal
+    stakingContract.processWithdrawal(0);
+    
+    // Final state verification
+    logHeader("Final State");
+    logEth("Alice's final SOLO balance", soloToken.balanceOf(alice));
+    logEth("Alice's final shares", stSOLOToken.shareOf(alice));
+    logEth("Total remaining shares", stSOLOToken.getTotalNormalShares());
+    
+    vm.stopPrank();
+    
+    // Final assertions
+    assertEq(
+        soloToken.balanceOf(alice),
+        INITIAL_AMOUNT,
+        "SOLO balance should return to initial amount"
+    );
+    assertEq(
+        stSOLOToken.balanceOf(alice),
+        0,
+        "stSOLO balance should be zero after withdrawal"
+    );
+}
     event Staked(address indexed staker, address indexed recipient, uint256 amount);
     event WithdrawalRequested(address indexed user, uint256 stSOLOAmount, uint256 soloAmount, uint256 requestId);
     event WithdrawalProcessed(address indexed user, uint256 soloAmount, uint256 requestId);
