@@ -91,27 +91,22 @@ contract SuperiorSOLOStakingTest is Test {
     function test_StakingAndShareAccounting() public {
         uint256 stakeAmount = 1000 * 10**18;
         
-        // Record initial total supply and shares
-        uint256 initialSupply = stSOLOToken.totalSupply();
-        uint256 initialShares = stSOLOToken.totalShares();
-        
+        // For the first stake, shares should equal the staked amount
         vm.startPrank(alice);
         soloToken.approve(address(stakingContract), stakeAmount);
         stakingContract.stake(stakeAmount, alice);
         vm.stopPrank();
 
-        // Calculate expected shares using the same formula as the contract
-        uint256 expectedShares = (stakeAmount * initialShares) / initialSupply;
-        
-        assertEq(stSOLOToken.shareOf(alice), expectedShares, "Shares should match expected calculation");
-        assertTrue(stSOLOToken.balanceOf(alice) >= stakeAmount, "Balance should be at least stake amount");
-    
+        // First staker should receive shares equal to their staked amount
+        assertEq(stSOLOToken.shareOf(alice), stakeAmount, "Initial shares should equal staked amount");
+        assertEq(stSOLOToken.balanceOf(alice), stakeAmount, "Initial balance should equal staked amount");
+
         // Advance time and rebase
         vm.warp(block.timestamp + 365 days);
         stSOLOToken.rebase();
 
         // After rebase, shares should remain the same while balance increases
-        assertEq(stSOLOToken.shareOf(alice), expectedShares, "Shares should remain unchanged after rebase");
+        assertEq(stSOLOToken.shareOf(alice), stakeAmount, "Shares should remain unchanged after rebase");
         assertTrue(stSOLOToken.balanceOf(alice) > stakeAmount, "Balance should increase after rebase");
     }
 

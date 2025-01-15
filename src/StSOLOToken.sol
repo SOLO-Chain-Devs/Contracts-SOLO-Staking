@@ -38,7 +38,6 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     uint256 public rebaseInterval;  // Time between rebases in seconds
     uint256 public constant MIN_REBASE_INTERVAL = 1 hours;
     uint256 public constant MAX_REBASE_INTERVAL = 30 days;
-    address public constant DEAD_ADDRESS = address(0x000000000000000000000000000000000000dEaD);
     uint256 private _totalNormalShares;
     uint256 private _totalExcludedShares;
     uint256 private _tokenPerShare; // Tracks accumulated rewards per share
