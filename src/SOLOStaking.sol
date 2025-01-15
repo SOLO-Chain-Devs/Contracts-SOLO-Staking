@@ -47,6 +47,7 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
     event WithdrawalRequested(address indexed user, uint256 stSOLOAmount, uint256 soloAmount, uint256 requestId);
     event WithdrawalProcessed(address indexed user, uint256 soloAmount, uint256 requestId);
     event WithdrawalDelayUpdated(uint256 oldDelay, uint256 newDelay);
+    event EmergencyWithdrawal(address indexed token, address indexed recipient, uint256 amount);
 
     /**
      * @notice Contract constructor
@@ -196,5 +197,41 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
         }
 
         return (soloAmounts, stSOLOAmounts, requestTimes, processed);
+    }
+
+    /**
+     * @notice Emergency SOLO Withdrawal Function
+     * @notice Allows owner to withdraw SOLO tokens in case of emergency
+     * @dev Implements strict access control and safety checks
+     */
+    function emergencyWithdrawToken(
+        address token,
+        address recipient, 
+        uint256 amount
+    ) external nonReentrant onlyOwner {
+        // Deep security consideration - what if the soloToken address is malicious?
+        require(recipient != address(0), "Invalid recipient address");
+        require(amount > 0, "Amount must be greater than 0");
+
+        // Let me think about the IERC20 interface...
+        // We need to safely interact with the SOLO token
+        IERC20 erc20token = IERC20(token);
+        
+        // Critical check - do we have enough balance?
+        uint256 contractBalance = erc20token.balanceOf(address(this));
+        require(contractBalance >= amount, "Insufficient token balance");
+
+        // Before executing transfer, should we emit an event for transparency?
+        emit EmergencyWithdrawal(
+            token,
+            recipient,
+            amount
+        );
+
+        // Execute the transfer with best practices
+        // Should we use transfer() or safeTransfer()?
+        // SafeERC20 is generally preferred for maximum safety
+        bool success = erc20token.transfer(recipient, amount);
+        require(success, "Token transfer failed");
     }
 }
