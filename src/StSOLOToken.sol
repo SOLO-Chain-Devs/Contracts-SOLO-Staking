@@ -303,22 +303,55 @@ function _update(address from, address to, uint256 amount) internal virtual over
      * @notice Burns tokens
      * @dev Can only be called by staking contract
      * @param account Address to burn tokens from
-     * @param amount Amount of tokens to burn
+     * @param tokenAmount Amount of tokenAmount to burn
      */
-    function burn(address account, uint256 amount) external onlyStakingContract nonReentrant {
-         emit Debug_BurnAttempt(account, amount, _shares[account]);
+     function burn(address account, uint256 tokenAmount) external onlyStakingContract nonReentrant {
+    // Calculate shares needed based on user's request
+    uint256 shareAmount;
+    if (excludedFromRebase[account]) {
+        shareAmount = tokenAmount;
+    } else {
+        // Convert token amount to shares using current ratio
+        shareAmount = (tokenAmount * PRECISION_FACTOR) / _tokenPerShare;
+    }
+    
+    // Verify shares exist
+    require(shareAmount <= _shares[account], "Insufficient shares");
+    
+    // Update share accounting
+    _shares[account] -= shareAmount;
+    _totalShares -= shareAmount;
+    if (!excludedFromRebase[account]) {
+        _totalNormalShares -= shareAmount;
+    }
+    
+    // Burn the requested token amount
+    _burn(account, shareAmount);
+    
+    emit Burned(account, tokenAmount, shareAmount);
+}       
+
+
+    /**
+    * @notice Burns tokens
+        * @dev Can only be called by staking contract
+        * @param account Address to burn tokens from
+        * @param amount Amount of tokens to burn
+        function burn(address account, uint256 amount) external onlyStakingContract nonReentrant {
+        emit Debug_BurnAttempt(account, amount, _shares[account]);
         uint256 shareAmount = _amountToShare(amount);
         require(shareAmount <= _shares[account], "Insufficient shares");
-        
+
         _shares[account] -= shareAmount;
         _totalShares -= shareAmount;
         _burn(account, amount);
-        
-        emit Burned(account, amount, shareAmount);
-    }        
 
-    /**
-     * @notice Returns token balance of an account
+        emit Burned(account, amount, shareAmount);
+    }
+        */
+
+        /**
+         * @notice Returns token balance of an account
      * @dev Override of ERC20 balanceOf to use share-based accounting
      * @param account Address to check balance for
      * @return Token balance of the account

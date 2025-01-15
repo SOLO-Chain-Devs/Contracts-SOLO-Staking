@@ -136,7 +136,6 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
         //require(stSOLOToken.transferFrom(msg.sender, address(this), stSOLOAmount),"stSOLO transfer failed");
         //stSOLOToken.burn(address(this), stSOLOAmount);
         stSOLOToken.burn(msg.sender, stSOLOAmount);
-
         emit WithdrawalRequested(msg.sender, stSOLOAmount, soloAmount, requestId);
     }
 
