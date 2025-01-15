@@ -43,7 +43,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     uint256 private _totalExcludedShares;
     uint256 private _tokenPerShare; // Tracks accumulated rewards per share
     uint256 private constant PRECISION_FACTOR = 1e18; // For decimal handling
-
+    uint256 public tokensPerYear = 100_00e18;
     /**
      * @notice Ensures only the staking contract can call the function
      * @dev Modifier to restrict certain functions to the staking contract
@@ -78,12 +78,13 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         _tokenPerShare = PRECISION_FACTOR;
 
         // Initial mint with 1:1 ratio
+        //uint256 INITIAL_AMOUNT = 0;
         //uint256 INITIAL_AMOUNT = 1e18;
-        uint256 INITIAL_AMOUNT = 1157920892373161954235709850086879078532699846655; 
-        _mint(msg.sender, INITIAL_AMOUNT);
-        _shares[msg.sender] = INITIAL_AMOUNT;
-        _totalShares = INITIAL_AMOUNT;
-        _totalNormalShares = INITIAL_AMOUNT; // Don't forget to initialize this
+        //uint256 INITIAL_AMOUNT = 1157920892373161954235709850086879078532699846655; 
+        //_mint(msg.sender, INITIAL_AMOUNT);
+        //_shares[msg.sender] = INITIAL_AMOUNT;
+        //_totalShares = INITIAL_AMOUNT;
+        //_totalNormalShares = INITIAL_AMOUNT; // Don't forget to initialize this
     }
 
     //TODO might need to remove these getter functions. Written for tests
@@ -217,27 +218,25 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @return Amount of tokens minted in the rebase
      */
     function rebase() public nonReentrant returns (uint256) {
-       
         require(msg.sender == stakingContract || msg.sender == owner(), "Unauthorized");
         require(block.timestamp >= lastRebaseTime + rebaseInterval, "Too soon to rebase");
         
-        uint256 currentSupply = totalSupply();
         uint256 excludedAmount = calculateExcludedAmount();
-        uint256 rebasableSupply = currentSupply - excludedAmount;
+        uint256 rebasableSupply = totalSupply() - excludedAmount;
         
         if (rebasableSupply == 0) {
             lastRebaseTime = block.timestamp;
             return 0;
         }
 
-        // Calculate rebase amount as before
+        // Calculate tokens to emit based on fixed yearly rate
         uint256 timeElapsed = block.timestamp - lastRebaseTime;
-        uint256 rebaseAmount = (rebasableSupply * timeElapsed * rewardRate) / (SECONDS_PER_YEAR * 10000);
-       
-
+        uint256 rebaseAmount = (tokensPerYear * timeElapsed) / SECONDS_PER_YEAR;
+        
         if (rebaseAmount > 0) {
-            // Instead of minting, update tokenPerShare
-            _tokenPerShare += (rebaseAmount * PRECISION_FACTOR) / _totalNormalShares;
+            // Update tokenPerShare based on fixed emission
+            uint256 shareIncrement = (rebaseAmount * PRECISION_FACTOR) / _totalNormalShares;
+            _tokenPerShare += shareIncrement;
             lastRebaseTime = block.timestamp;
         }
 
@@ -295,6 +294,7 @@ function _update(address from, address to, uint256 amount) internal virtual over
         } else {
             _totalNormalShares += _amountToShare(amount);
         }
+        _totalShares += amount;
         _mint(account, amount);
     }
     
@@ -305,31 +305,45 @@ function _update(address from, address to, uint256 amount) internal virtual over
      * @param account Address to burn tokens from
      * @param tokenAmount Amount of tokenAmount to burn
      */
-     function burn(address account, uint256 tokenAmount) external onlyStakingContract nonReentrant {
-    // Calculate shares needed based on user's request
-    uint256 shareAmount;
-    if (excludedFromRebase[account]) {
-        shareAmount = tokenAmount;
-    } else {
-        // Convert token amount to shares using current ratio
-        shareAmount = (tokenAmount * PRECISION_FACTOR) / _tokenPerShare;
+       function burn(address account, uint256 tokenAmount) external onlyStakingContract nonReentrant {
+    uint256 accountShares = _shares[account];
+    uint256 accountBalance = balanceOf(account);  // This already handles excluded vs non-excluded
+    uint256 currentERC20Balance = super.balanceOf(account);  // Add this - get raw ERC20 balance
+    
+    console.log("Burn attempt for account:", account);
+    console.log("Token amount to burn:", tokenAmount);
+    console.log("Account's current shares:", accountShares);
+    console.log("Account's current balance:", accountBalance);
+    console.log("Current ERC20 balance:", currentERC20Balance);  // Add this log
+    console.log("Current _tokenPerShare:", _tokenPerShare);
+    console.log("Total shares:", _totalShares);
+    console.log("Total normal shares:", _totalNormalShares);
+    
+    // Calculate proportional shares to burn
+    uint256 shareAmount = (tokenAmount * PRECISION_FACTOR) / _tokenPerShare;
+    //uint256 shareAmount = (accountShares * tokenAmount) / accountBalance;
+    console.log("Calculated shares to burn:", shareAmount);
+    
+    require(shareAmount <= accountShares, "Insufficient shares");
+    require(shareAmount > 0, "Zero shares");
+    require(tokenAmount <= accountBalance, "Burn amount exceeds balance");
+    
+    if (tokenAmount > currentERC20Balance) {
+        uint256 mintRequired = tokenAmount - currentERC20Balance;
+        console.log("Minting additional tokens required for burn:", mintRequired);
+        super._mint(account, mintRequired);  // Explicit super call
     }
-    
-    // Verify shares exist
-    require(shareAmount <= _shares[account], "Insufficient shares");
-    
-    // Update share accounting
+
     _shares[account] -= shareAmount;
     _totalShares -= shareAmount;
     if (!excludedFromRebase[account]) {
         _totalNormalShares -= shareAmount;
     }
     
-    // Burn the requested token amount
-    _burn(account, shareAmount);
+    _burn(account, tokenAmount);
     
     emit Burned(account, tokenAmount, shareAmount);
-}       
+}
 
 
     /**

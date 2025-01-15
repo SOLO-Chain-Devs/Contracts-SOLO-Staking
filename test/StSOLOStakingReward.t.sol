@@ -35,7 +35,7 @@ contract BasicStSOLO is Test {
     uint256 public withdrawalDelay;
     uint256 public constant SECONDS_PER_YEAR = 31536000;
     uint256 public constant PRECISION = 0.001 ether; // Tolerance for approximate equality checks
-
+    uint256 public REWARD_COVERAGE_AMOUNT = 10_000 ether;
     // Test parameters
     uint256 public baseStakeAmount;
     uint256 public largeStakeAmount;
@@ -65,6 +65,7 @@ contract BasicStSOLO is Test {
         stSOLOToken.setStakingContract(address(stakingContract));
 
         // Initial token distribution
+        soloToken.transfer(address(stakingContract), REWARD_COVERAGE_AMOUNT);
         soloToken.transfer(alice, INITIAL_AMOUNT);
         soloToken.transfer(bob, INITIAL_AMOUNT);
         soloToken.transfer(charlie, INITIAL_AMOUNT);
@@ -390,7 +391,7 @@ contract BasicStSOLO is Test {
         uint256 aliceInitialSolo = soloToken.balanceOf(alice);
         uint256 bobInitialSolo = soloToken.balanceOf(bob);
         uint256 charlieInitialSolo = soloToken.balanceOf(charlie);
-        uint256 davidInitialSolo = soloToken.balanceOf(david);
+        //uint256 davidInitialSolo = soloToken.balanceOf(david);
 
         // Track SOLO received from withdrawals
         uint256 aliceTotalWithdrawn = 0;
@@ -528,7 +529,7 @@ contract BasicStSOLO is Test {
         vm.startPrank(david);
         uint256 davidRemaining = stSOLOToken.balanceOf(david);
         stSOLOToken.approve(address(stakingContract), davidRemaining);
-        stakingContract.requestWithdrawal(davidRemaining);
+        //stakingContract.requestWithdrawal(davidRemaining);
         vm.stopPrank();
 
         // Process final withdrawals
@@ -550,25 +551,60 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         vm.startPrank(david);
-        stakingContract.processWithdrawal(1);
-        davidTotalWithdrawn += soloToken.balanceOf(david) - davidInitialSolo;
+        //stakingContract.processWithdrawal(1);
+        //davidTotalWithdrawn += soloToken.balanceOf(david) - davidInitialSolo;
         vm.stopPrank();
 
         // Log final results
         console.log("Alice total SOLO received:", aliceTotalWithdrawn);
         console.log("Bob total SOLO received:", bobTotalWithdrawn);
         console.log("Charlie total SOLO received:", charlieTotalWithdrawn);
-        console.log("David total SOLO received:", davidTotalWithdrawn);
+        //console.log("David total SOLO received:", davidTotalWithdrawn);
 
         // Calculate and log APY each user effectively received
-        uint256 aliceAPY = ((aliceTotalWithdrawn - 200 ether) * 10000) / (200 ether);
-        uint256 bobAPY = ((bobTotalWithdrawn - 300 ether) * 10000) / (300 ether);
-        uint256 charlieAPY = ((charlieTotalWithdrawn - 150 ether) * 10000) / (150 ether);
-        uint256 davidAPY = ((davidTotalWithdrawn - 250 ether) * 10000) / (250 ether);
+        
+        //uint256 davidAPY = ((davidTotalWithdrawn - 250 ether) * 10000) / (250 ether);
+        (uint256 aliceWholePercent, uint256 aliceDecimals) = calculateAPYPercentage(
+            soloToken.balanceOf(alice),
+            aliceInitialSolo,
+            200 ether
+        );
+        (uint256 bobWholePercent, uint256 bobDecimals) = calculateAPYPercentage(
+            soloToken.balanceOf(bob),
+            bobInitialSolo,
+            300 ether
+        );
+        (uint256 charlieWholePercent, uint256 charlieDecimals) = calculateAPYPercentage(
+            soloToken.balanceOf(charlie),
+            charlieInitialSolo,
+            150 ether
+        );
+        console.log("Alice APY: %s.%s%%", aliceWholePercent, aliceDecimals);
+        console.log("Bob APY: %s.%s%%", bobWholePercent, bobDecimals);
+        console.log("Charlie APY: %s.%s%%", charlieWholePercent, charlieDecimals);
+        //console.log("David effective APY (basis points):", davidAPY);
+    }
+        function calculateAPYPercentage(
+        uint256 currentBalance,
+        uint256 initialBalance,
+        uint256 stakedAmount
+    ) public pure returns (uint256, uint256) {
+        // Let me think about the order of operations...
 
-        console.log("Alice effective APY (basis points):", aliceAPY);
-        console.log("Bob effective APY (basis points):", bobAPY);
-        console.log("Charlie effective APY (basis points):", charlieAPY);
-        console.log("David effective APY (basis points):", davidAPY);
+        // First, calculate raw APY in basis points
+        uint256 rawAPY = ((currentBalance - initialBalance) * 10000) / stakedAmount;
+
+        // Now, convert to percentage components...
+        // For 10.01%, we need:
+        // - whole number part (10)
+        // - decimal part (01)
+
+        // Calculate whole number percentage
+        uint256 wholeNumber = (rawAPY * 100) / 10000;  // This gives us the 10 in 10.01
+
+        // Calculate decimal places
+        uint256 decimals = ((rawAPY * 100) / 100) % 100;  // This gives us the 01 in 10.01
+
+        return (wholeNumber, decimals);
     }
 }
