@@ -1,4 +1,8 @@
 # TODO
+## Personal TODO
+- [ ] Clean up the smart contract and deployment values
+- [ ] Update TODO tests
+- [ ] Update this TODO file
 
 ## Core Questions
 - [ ] Decide on rebase mechanism:
