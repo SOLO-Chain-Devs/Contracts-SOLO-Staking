@@ -31,11 +31,11 @@ contract BasicStSOLO is Test {
     address public david;
     // Configuration constants
     uint256 public constant INITIAL_AMOUNT = 1000 * 10 ** 18;
-    uint256 public rewardRate; // APR in basis points (100 = 1%)
+    uint256 public constant INITIAL_TOKENS_PER_YEAR_RATE = 100_000 ether; 
     uint256 public withdrawalDelay;
     uint256 public constant SECONDS_PER_YEAR = 31536000;
     uint256 public constant PRECISION = 0.001 ether; // Tolerance for approximate equality checks
-    uint256 public REWARD_COVERAGE_AMOUNT = 10_000 ether;
+    uint256 public REWARD_COVERAGE_AMOUNT = 100_000 ether;
     // Test parameters
     uint256 public baseStakeAmount;
     uint256 public largeStakeAmount;
@@ -48,14 +48,13 @@ contract BasicStSOLO is Test {
         charlie = makeAddr("charlie");
         david = makeAddr("david");
         // Set configurable parameters
-        rewardRate = 10_000; // 10% APR by default
         withdrawalDelay = 7 days;
         baseStakeAmount = 100 ether;
         largeStakeAmount = 500 ether;
 
         // Deploy contracts
         soloToken = new MockSOLO();
-        stSOLOToken = new StSOLOToken(rewardRate);
+        stSOLOToken = new StSOLOToken(INITIAL_TOKENS_PER_YEAR_RATE);
         stakingContract = new SOLOStaking(
             address(soloToken),
             address(stSOLOToken),

@@ -11,8 +11,6 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "forge-std/Test.sol";
-
 
 /**
  * @title StSOLOToken
@@ -38,11 +36,12 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     uint256 public rebaseInterval;  // Time between rebases in seconds
     uint256 public constant MIN_REBASE_INTERVAL = 1 hours;
     uint256 public constant MAX_REBASE_INTERVAL = 30 days;
+    uint256 public constant MAX_TOKENS_PER_YEAR = 100_000_000_000 ether;
     uint256 private _totalNormalShares;
     uint256 private _totalExcludedShares;
     uint256 private _tokenPerShare; // Tracks accumulated rewards per share
-    uint256 private constant PRECISION_FACTOR = 1e18; // For decimal handling
-    uint256 public tokensPerYear = 100_00e18;
+    uint256 public constant PRECISION_FACTOR = 1e18; // For decimal handling
+    uint256 public tokensPerYear;
     /**
      * @notice Ensures only the staking contract can call the function
      * @dev Modifier to restrict certain functions to the staking contract
@@ -65,25 +64,16 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
 
     /**
      * @notice Contract constructor
-     * @dev Initializes the contract with an initial reward rate
-     * @param _initialRewardRate Initial annual reward rate in basis points
+     * @dev Initializes the contract with an initial growth of tokensPerYear
+     * @param _tokensPerYear Initial annual reward in tokensPerYear
      */
-    constructor(uint256 _initialRewardRate) ERC20("Staked SOLO", "stSOLO") Ownable(msg.sender) {
-        rewardRate = _initialRewardRate;
+    constructor(uint256 _tokensPerYear) ERC20("Staked SOLO", "stSOLO") Ownable(msg.sender) {
+        tokensPerYear = _tokensPerYear;
         lastRebaseTime = block.timestamp;
-        rebaseInterval = 1 days;
+        rebaseInterval = 12 hours;
 
         // Initialize tokenPerShare at PRECISION_FACTOR for 1:1 initial ratio
         _tokenPerShare = PRECISION_FACTOR;
-
-        // Initial mint with 1:1 ratio
-        //uint256 INITIAL_AMOUNT = 0;
-        //uint256 INITIAL_AMOUNT = 1e18;
-        //uint256 INITIAL_AMOUNT = 1157920892373161954235709850086879078532699846655; 
-        //_mint(msg.sender, INITIAL_AMOUNT);
-        //_shares[msg.sender] = INITIAL_AMOUNT;
-        //_totalShares = INITIAL_AMOUNT;
-        //_totalNormalShares = INITIAL_AMOUNT; // Don't forget to initialize this
     }
 
     //TODO might need to remove these getter functions. Written for tests
@@ -233,18 +223,9 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         uint256 rebaseAmount = (tokensPerYear * timeElapsed) / SECONDS_PER_YEAR;
         
         if (rebaseAmount > 0) {
-            console.log("Debug rebase values:");
-            console.log("rebaseAmount:", rebaseAmount);
-            console.log("_totalNormalShares:", _totalNormalShares);
-            console.log("PRECISION_FACTOR:", PRECISION_FACTOR);
-            console.log("Current _tokenPerShare:", _tokenPerShare);
-
             // Update tokenPerShare based on fixed emission
             uint256 shareIncrement = (rebaseAmount * PRECISION_FACTOR * 2) / _totalNormalShares;
-            console.log("shareIncrement:", shareIncrement);
-
             _tokenPerShare += shareIncrement;
-            console.log("New _tokenPerShare:", _tokenPerShare);
             lastRebaseTime = block.timestamp;
         }
 
@@ -259,36 +240,36 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @param to Address tokens are transferred to
      * @param amount Amount of tokens transferred
      */
-function _update(address from, address to, uint256 amount) internal virtual override {
-    if (to == address(0)) {
-        super._update(from, to, amount);
-        return;
-    }
+    function _update(address from, address to, uint256 amount) internal virtual override {
+        if (to == address(0)) {
+            super._update(from, to, amount);
+            return;
+        }
 
-    uint256 shareAmount;
-    if (excludedFromRebase[to] || excludedFromRebase[from]) {
-        shareAmount = amount;
-    } else {
-        shareAmount = _amountToShare(amount);
-    }
-    
-    if (from != address(0)) {
-        require(shareAmount <= _shares[from], "Insufficient shares during update");
-        _shares[from] -= shareAmount;
-        if (!excludedFromRebase[from]) {
-            _totalNormalShares -= shareAmount;
+        uint256 shareAmount;
+        if (excludedFromRebase[to] || excludedFromRebase[from]) {
+            shareAmount = amount;
+        } else {
+            shareAmount = _amountToShare(amount);
         }
-    }
-    
-    if (to != address(0)) {
-        _shares[to] += shareAmount;
-        if (!excludedFromRebase[to]) {
-            _totalNormalShares += shareAmount;
+        
+        if (from != address(0)) {
+            require(shareAmount <= _shares[from], "Insufficient shares during update");
+            _shares[from] -= shareAmount;
+            if (!excludedFromRebase[from]) {
+                _totalNormalShares -= shareAmount;
+            }
         }
+        
+        if (to != address(0)) {
+            _shares[to] += shareAmount;
+            if (!excludedFromRebase[to]) {
+                _totalNormalShares += shareAmount;
+            }
+        }
+        
+        super._update(from, to, amount);
     }
-    
-    super._update(from, to, amount);
-}
 
     /**
      * @notice Mints new tokens
@@ -313,24 +294,14 @@ function _update(address from, address to, uint256 amount) internal virtual over
      * @param account Address to burn tokens from
      * @param tokenAmount Amount of tokenAmount to burn
      */
-       function burn(address account, uint256 tokenAmount) external onlyStakingContract nonReentrant {
+    function burn(address account, uint256 tokenAmount) external onlyStakingContract nonReentrant {
     uint256 accountShares = _shares[account];
     uint256 accountBalance = balanceOf(account);  // This already handles excluded vs non-excluded
     uint256 currentERC20Balance = super.balanceOf(account);  // Add this - get raw ERC20 balance
     
-    console.log("Burn attempt for account:", account);
-    console.log("Token amount to burn:", tokenAmount);
-    console.log("Account's current shares:", accountShares);
-    console.log("Account's current balance:", accountBalance);
-    console.log("Current ERC20 balance:", currentERC20Balance);  // Add this log
-    console.log("Current _tokenPerShare:", _tokenPerShare);
-    console.log("Total shares:", _totalShares);
-    console.log("Total normal shares:", _totalNormalShares);
-    
     // Calculate proportional shares to burn
     uint256 shareAmount = (tokenAmount * PRECISION_FACTOR) / _tokenPerShare;
     //uint256 shareAmount = (accountShares * tokenAmount) / accountBalance;
-    console.log("Calculated shares to burn:", shareAmount);
     
     require(shareAmount <= accountShares, "Insufficient shares");
     require(shareAmount > 0, "Zero shares");
@@ -338,8 +309,7 @@ function _update(address from, address to, uint256 amount) internal virtual over
     
     if (tokenAmount > currentERC20Balance) {
         uint256 mintRequired = tokenAmount - currentERC20Balance;
-        console.log("Minting additional tokens required for burn:", mintRequired);
-        super._mint(account, mintRequired);  // Explicit super call
+        super._mint(account, mintRequired);  // Explicit super call. Needed because we mix ERC20 with this weird rebase architecture
     }
 
     _shares[account] -= shareAmount;
@@ -387,18 +357,14 @@ function _update(address from, address to, uint256 amount) internal virtual over
     }
 
     /**
-     * @notice Updates the reward rate
-     * @dev Can only be called by owner, capped at 30% APR
-     * @param _newRate New annual reward rate in basis points
+     * @notice Updates the reward tokensPerYear rate
+     * @dev Can only be called by owner, capped at a specific value
+     * @param _newTokensPerYear New annual reward rate in basis points
      */
-    function setRewardRate(uint256 _newRate) external onlyOwner {
-        require(_newRate <= 3000, "Rate too high"); // Max 30% APR
+    function setRewardTokensPerYear(uint256 _newTokensPerYear) external onlyOwner {
+        require(_newTokensPerYear <= MAX_TOKENS_PER_YEAR, "TokensPerYear inflation exceeds max"); 
         rebase();
-        emit RewardRateUpdated(rewardRate, _newRate);
-        rewardRate = _newRate;
-    }
-
-    function GET_PRECISION_FACTOR() public pure returns (uint256) {
-    return PRECISION_FACTOR;
+        tokensPerYear = _newTokensPerYear;
+        emit RewardRateUpdated(tokensPerYear, _newTokensPerYear);
     }
 }

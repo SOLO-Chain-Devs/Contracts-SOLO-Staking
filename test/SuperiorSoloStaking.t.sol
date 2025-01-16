@@ -41,7 +41,7 @@ contract SuperiorSOLOStakingTest is Test {
 
     // Carefully chosen test parameters
     uint256 public constant INITIAL_AMOUNT = 10000 * 10**18;    // Substantial enough for all test cases
-    uint256 public constant INITIAL_REWARD_RATE = 500;          // 5% APR - realistic staking yield
+    uint256 public constant INITIAL_TOKENS_PER_YEAR_RATE = 100_000 ether; 
     uint256 public constant INITIAL_WITHDRAWAL_DELAY = 7 days;  // Standard lock period
 
     /**
@@ -65,7 +65,7 @@ contract SuperiorSOLOStakingTest is Test {
 
         // Contract deployment and configuration
         soloToken = new MockSOLO();
-        stSOLOToken = new StSOLOToken(INITIAL_REWARD_RATE);
+        stSOLOToken = new StSOLOToken(INITIAL_TOKENS_PER_YEAR_RATE);
         stakingContract = new SOLOStaking(
             address(soloToken),
             address(stSOLOToken),
