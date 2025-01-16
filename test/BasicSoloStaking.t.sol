@@ -31,7 +31,7 @@ contract SOLOStakingTest is Test {
     address public alice;
     address public bob;
     uint256 public constant INITIAL_AMOUNT = 1000 * 10**18;
-    uint256 public constant INITIAL_REWARD_RATE = 500; // 5% APR
+    uint256 public constant INITIAL_TOKENS_PER_YEAR_RATE = 100_000 ether; 
     uint256 public constant INITIAL_WITHDRAWAL_DELAY = 7 days;
 
     /**
@@ -49,7 +49,7 @@ contract SOLOStakingTest is Test {
         bob = makeAddr("bob");
 
         soloToken = new MockSOLO();
-        stSOLOToken = new StSOLOToken(INITIAL_REWARD_RATE);
+        stSOLOToken = new StSOLOToken(INITIAL_TOKENS_PER_YEAR_RATE);
         stakingContract = new SOLOStaking(
             address(soloToken),
             address(stSOLOToken),
@@ -75,7 +75,7 @@ contract SOLOStakingTest is Test {
         assertEq(address(stakingContract.soloToken()), address(soloToken));
         assertEq(address(stakingContract.stSOLOToken()), address(stSOLOToken));
         assertEq(stakingContract.withdrawalDelay(), INITIAL_WITHDRAWAL_DELAY);
-        assertEq(stSOLOToken.rewardRate(), INITIAL_REWARD_RATE);
+        assertEq(stSOLOToken.tokensPerYear(), INITIAL_TOKENS_PER_YEAR_RATE);
     }
 
     /**
@@ -83,10 +83,10 @@ contract SOLOStakingTest is Test {
      * @dev Verifies that setting a reward rate above 30% APR reverts
      */
     function test_RevertWhen_SettingExcessiveRewardRate() public {
-        uint256 tooHighRate = 3100; // 31% APR
-        vm.expectRevert("Rate too high");
+        uint256 tooHighRate = stSOLOToken.MAX_TOKENS_PER_YEAR() + 1;  // Same value as MAX_TOKENS_PER_YEAR
+        vm.expectRevert("TokensPerYear inflation exceeds max");
         vm.prank(owner);
-        stSOLOToken.setRewardRate(tooHighRate);
+        stSOLOToken.setRewardTokensPerYear(tooHighRate);
     }
 
     /**
@@ -125,11 +125,11 @@ contract SOLOStakingTest is Test {
      * @dev Verifies reward rate can be updated within allowed range
      */
     function test_UpdateRewardRate() public {
-        uint256 newRate = 1000; // 10% APR
+        uint256 newRate = 1000; 
         vm.prank(owner);
         vm.warp(block.timestamp + 1 days); // need to warp 1 day so that rebase can occur
-        stSOLOToken.setRewardRate(newRate);
-        assertEq(stSOLOToken.rewardRate(), newRate);
+        stSOLOToken.setRewardTokensPerYear(newRate);
+        assertEq(stSOLOToken.tokensPerYear(), newRate);
     }
 
     /**

@@ -21,7 +21,7 @@ contract SOLOStakingFailingTest is Test {
     address public alice;
     address public bob;
     uint256 public constant INITIAL_AMOUNT = 1000 * 10**18;
-    uint256 public constant INITIAL_REWARD_RATE = 500; // 5% APR
+    uint256 public constant INITIAL_TOKENS_PER_YEAR_RATE = 100_000 ether; 
     uint256 public constant INITIAL_WITHDRAWAL_DELAY = 7 days;
 
     // HELPER functions
@@ -97,7 +97,7 @@ contract SOLOStakingFailingTest is Test {
         bob = makeAddr("bob");
 
         soloToken = new MockSOLO();
-        stSOLOToken = new StSOLOToken(INITIAL_REWARD_RATE);
+        stSOLOToken = new StSOLOToken(INITIAL_TOKENS_PER_YEAR_RATE);
         stakingContract = new SOLOStaking(
             address(soloToken),
             address(stSOLOToken),
@@ -309,8 +309,8 @@ function test_YieldCalculationSimpleSingle() public {
                // Calculate expected yield using share-based model
                uint256 shares = stSOLOToken.shareOf(users[i]);
                uint256 periodRebaseAmount = (stSOLOToken.tokensPerYear() * timeElapsed) / stSOLOToken.SECONDS_PER_YEAR();
-               uint256 shareIncrement = (periodRebaseAmount * stSOLOToken.GET_PRECISION_FACTOR() * 2) / stSOLOToken.getTotalNormalShares();
-               uint256 expectedYield = (shares * shareIncrement) / stSOLOToken.GET_PRECISION_FACTOR();
+               uint256 shareIncrement = (periodRebaseAmount * stSOLOToken.PRECISION_FACTOR() * 2) / stSOLOToken.getTotalNormalShares();
+               uint256 expectedYield = (shares * shareIncrement) / stSOLOToken.PRECISION_FACTOR();
                
                logMinor(string.concat("User ", vm.toString(i)));
                logEth("Current balance:", currentBalance);

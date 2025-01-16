@@ -27,7 +27,7 @@ contract GasMiningIntegrationTest is Test {
     uint256 public constant INITIAL_AMOUNT = 1000 * 10**18;
     uint256 public constant BLOCK_REWARD = 10 * 10**18; // 10 tokens per block
     uint256 public constant EPOCH_DURATION = 100; // 100 blocks per epoch
-    uint256 public constant INITIAL_REWARD_RATE = 500; // 5% APR
+    uint256 public constant INITIAL_TOKENS_PER_YEAR_RATE = 100_000 ether; 
     uint256 public constant INITIAL_WITHDRAWAL_DELAY = 7 days;
 
     event RewardStaked(address indexed user, address indexed stakingContract, uint256 amount);
@@ -44,7 +44,7 @@ contract GasMiningIntegrationTest is Test {
 
         // Deploy contracts
         soloToken = new MockSOLO();
-        stSOLOToken = new StSOLOToken(INITIAL_REWARD_RATE);
+        stSOLOToken = new StSOLOToken(INITIAL_TOKENS_PER_YEAR_RATE);
         stakingContract = new SOLOStaking(
             address(soloToken),
             address(stSOLOToken),
