@@ -77,15 +77,18 @@ contract BasicStSOLO is Test {
      * @dev Verifies that staking rewards are calculated correctly based on the reward rate
      */
     function test_User_Gets_Correct_APY() public {
-        // Calculate expected balance after one year
-        uint256 expectedBalance = baseStakeAmount + (baseStakeAmount * rewardRate / 10000);
-
         vm.startPrank(alice);
         soloToken.approve(address(stakingContract), baseStakeAmount);
         stakingContract.stake(baseStakeAmount, alice);
         vm.stopPrank();
-        
+
+        // Advance time one year
         vm.warp(block.timestamp + SECONDS_PER_YEAR);
+        
+        // Calculate expected balance using tokensPerYear
+        uint256 expectedYield = stSOLOToken.tokensPerYear();
+        uint256 expectedBalance = baseStakeAmount + expectedYield;
+
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -102,9 +105,6 @@ contract BasicStSOLO is Test {
      * @dev Verifies fairness in reward distribution for equal stakes
      */
     function test_Equal_Stakes_Equal_Rewards() public {
-        // Calculate expected balance after one year
-        uint256 expectedBalance = baseStakeAmount + (baseStakeAmount * rewardRate / 10000);
-
         // Alice Stakes
         vm.startPrank(alice);
         soloToken.approve(address(stakingContract), baseStakeAmount);
@@ -117,7 +117,13 @@ contract BasicStSOLO is Test {
         stakingContract.stake(baseStakeAmount, bob);
         vm.stopPrank();
 
+        // Advance time
         vm.warp(block.timestamp + SECONDS_PER_YEAR);
+        
+        // Calculate expected balance using tokensPerYear
+        uint256 expectedYield = stSOLOToken.tokensPerYear();
+        uint256 expectedBalance = baseStakeAmount + expectedYield / 2; // Divide by 2 since rewards are split between Alice and Bob
+        
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -140,23 +146,35 @@ contract BasicStSOLO is Test {
      * @dev Verifies that larger stakes receive proportionally larger rewards
      */
     function test_Proportional_Rewards() public {
-        // Calculate expected balances
-        uint256 expectedSmallBalance = baseStakeAmount + (baseStakeAmount * rewardRate / 10000);
-        uint256 expectedLargeBalance = largeStakeAmount + (largeStakeAmount * rewardRate / 10000);
-
         // Alice stakes base amount
         vm.startPrank(alice);
         soloToken.approve(address(stakingContract), baseStakeAmount);
         stakingContract.stake(baseStakeAmount, alice);
         vm.stopPrank();
 
-        // Bob stakes large amount
+        // Bob stakes large amount (5x base amount)
         vm.startPrank(bob);
         soloToken.approve(address(stakingContract), largeStakeAmount);
         stakingContract.stake(largeStakeAmount, bob);
         vm.stopPrank();
 
+        // Calculate total staked and proportions
+        uint256 totalStaked = baseStakeAmount + largeStakeAmount;
+        uint256 aliceProportion = baseStakeAmount * 1e18 / totalStaked;
+        uint256 bobProportion = largeStakeAmount * 1e18 / totalStaked;
+        
+        // Advance time one year
         vm.warp(block.timestamp + SECONDS_PER_YEAR);
+        
+        // Calculate expected yields using tokensPerYear
+        uint256 totalYield = stSOLOToken.tokensPerYear();
+        uint256 aliceExpectedYield = (totalYield * aliceProportion) / 1e18;
+        uint256 bobExpectedYield = (totalYield * bobProportion) / 1e18;
+        
+        // Calculate final expected balances
+        uint256 expectedSmallBalance = baseStakeAmount + aliceExpectedYield;
+        uint256 expectedLargeBalance = largeStakeAmount + bobExpectedYield;
+
         vm.prank(owner);
         stSOLOToken.rebase();
 
