@@ -233,9 +233,18 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         uint256 rebaseAmount = (tokensPerYear * timeElapsed) / SECONDS_PER_YEAR;
         
         if (rebaseAmount > 0) {
+            console.log("Debug rebase values:");
+            console.log("rebaseAmount:", rebaseAmount);
+            console.log("_totalNormalShares:", _totalNormalShares);
+            console.log("PRECISION_FACTOR:", PRECISION_FACTOR);
+            console.log("Current _tokenPerShare:", _tokenPerShare);
+
             // Update tokenPerShare based on fixed emission
-            uint256 shareIncrement = (rebaseAmount * PRECISION_FACTOR) / _totalNormalShares;
+            uint256 shareIncrement = (rebaseAmount * PRECISION_FACTOR * 2) / _totalNormalShares;
+            console.log("shareIncrement:", shareIncrement);
+
             _tokenPerShare += shareIncrement;
+            console.log("New _tokenPerShare:", _tokenPerShare);
             lastRebaseTime = block.timestamp;
         }
 
@@ -387,5 +396,9 @@ function _update(address from, address to, uint256 amount) internal virtual over
         rebase();
         emit RewardRateUpdated(rewardRate, _newRate);
         rewardRate = _newRate;
+    }
+
+    function GET_PRECISION_FACTOR() public pure returns (uint256) {
+    return PRECISION_FACTOR;
     }
 }
