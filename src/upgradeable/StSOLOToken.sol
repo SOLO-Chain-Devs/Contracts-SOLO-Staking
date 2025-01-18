@@ -1,38 +1,35 @@
-/**
- * @title StSOLO Token Contract
- * @author Original contract enhanced with NatSpec
- * @notice This contract implements a staking token that supports rebasing and exclusions
- * @dev Implements ERC20 with additional share-based accounting for rebasing functionality
- */
-
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.16;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "forge-std/Test.sol";
+
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 /**
- * @title StSOLOToken
+ * @title Upgradeable StSOLOToken
  * @notice A staked token contract that implements rebasing functionality with exclusion support
- * @dev Inherits from ERC20, Ownable, and ReentrancyGuard for core functionality
+ * @dev Inherits from ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable, and ReentrancyGuardUpgradeable
  *      Uses share-based accounting to handle rebasing correctly
  */
-contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
+contract StSOLOToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     // Share accounting
     mapping(address => uint256) private _shares;
     uint256 private _totalShares;
-    
+
     // Rebase exclusion system
     mapping(address => bool) public excludedFromRebase;
     address[] public excludedAddresses;
-    
+
     // Core state variables
     uint256 public lastRebaseTime;
     uint256 public rewardRate; // Annual reward rate in basis points (1 = 0.01%)
     uint256 public constant SECONDS_PER_YEAR = 31536000;
     address public stakingContract;
-    
+
     uint256 public rebaseInterval;  // Time between rebases in seconds
     uint256 public constant MIN_REBASE_INTERVAL = 1 hours;
     uint256 public constant MAX_REBASE_INTERVAL = 30 days;
@@ -42,6 +39,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     uint256 private _tokenPerShare; // Tracks accumulated rewards per share
     uint256 public constant PRECISION_FACTOR = 1e18; // For decimal handling
     uint256 public tokensPerYear;
+
     /**
      * @notice Ensures only the staking contract can call the function
      * @dev Modifier to restrict certain functions to the staking contract
@@ -55,19 +53,26 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     event RebaseOccurred(uint256 totalSupply, uint256 rebaseAmount, uint256 excludedAmount);
     event RewardRateUpdated(uint256 oldRate, uint256 newRate);
     event AddressExcluded(address indexed account, bool excluded);
-    // TODO added these to help
     event Minted(address indexed account, uint256 amount, uint256 shares);
     event Burned(address indexed account, uint256 amount, uint256 shares);
     event RebaseIntervalUpdated(uint256 interval);
-    //TODO delete this
-    event Debug_BurnAttempt(address account, uint256 attemptedBurn, uint256 actualShares);
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
     /**
-     * @notice Contract constructor
-     * @dev Initializes the contract with an initial growth of tokensPerYear
-     * @param _tokensPerYear Initial annual reward in tokensPerYear
+     * @notice Contract initializer
+     * @dev Initializes the contract with initial parameters
+     * @param _tokensPerYear Initial annual reward in tokens per year
      */
-    constructor(uint256 _tokensPerYear) ERC20("Staked SOLO", "stSOLO") Ownable(msg.sender) {
+    function initialize(uint256 _tokensPerYear) public initializer {
+        __ERC20_init("Staked SOLO", "stSOLO");
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
+
         tokensPerYear = _tokensPerYear;
         lastRebaseTime = block.timestamp;
         rebaseInterval = 12 hours;
@@ -208,6 +213,9 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      */
     function rebase() public nonReentrant returns (uint256) {
         require(msg.sender == stakingContract || msg.sender == owner(), "Unauthorized");
+        console.log("block.timestamp",block.timestamp);
+        console.log("lastRebaseTime",lastRebaseTime);
+        console.log("rebaseInterval",rebaseInterval);
         require(block.timestamp >= lastRebaseTime + rebaseInterval, "Too soon to rebase");
         
         uint256 excludedAmount = calculateExcludedAmount();
@@ -367,4 +375,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         tokensPerYear = _newTokensPerYear;
         emit RewardRateUpdated(tokensPerYear, _newTokensPerYear);
     }
+
+    /// @dev Required by the OZ UUPS module
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }
