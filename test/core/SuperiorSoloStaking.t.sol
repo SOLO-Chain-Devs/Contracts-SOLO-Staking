@@ -3,8 +3,8 @@ pragma solidity ^0.8.0;
 
 import "forge-std/StdUtils.sol";
 import "forge-std/Test.sol";
-import "../src/SOLOStaking.sol";
-import "../src/StSOLOToken.sol";
+import "../../src/core/SOLOStaking.sol";
+import "../../src/core/StSOLOToken.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /**

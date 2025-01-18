@@ -2,9 +2,9 @@
 pragma solidity ^0.8.16;
 
 import "forge-std/Test.sol";
-import "../src/lib/GasMining.sol";
-import "../src/SOLOStaking.sol";
-import "../src/StSOLOToken.sol";
+import "../../src/core/lib/GasMining.sol";
+import "../../src/core/SOLOStaking.sol";
+import "../../src/core/StSOLOToken.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract MockSOLO is ERC20 {
