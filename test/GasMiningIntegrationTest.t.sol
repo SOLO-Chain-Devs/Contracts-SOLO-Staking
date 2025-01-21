@@ -43,6 +43,7 @@ function setUp() public {
     implementation = new GasMining();
     SOLOToken tokenImplementation = new SOLOToken();
     StSOLOToken stSOLOImplementation = new StSOLOToken();
+    SOLOStaking stakingImplementation = new SOLOStaking();
 
     // Deploy SOLO token proxy
     bytes memory tokenInitData = abi.encodeWithSelector(
@@ -55,7 +56,7 @@ function setUp() public {
     soloToken = SOLOToken(address(tokenProxy));
 
     // Deploy GasMining proxy
-    bytes memory initData = abi.encodeWithSelector(
+    bytes memory gasMiningInitData = abi.encodeWithSelector(
         GasMining.initialize.selector,
         address(soloToken),
         BLOCK_REWARD,
@@ -64,7 +65,7 @@ function setUp() public {
     );
     ERC1967Proxy gasMiningProxy = new ERC1967Proxy(
         address(implementation),
-        initData
+        gasMiningInitData
     );
     gasMining = GasMining(address(gasMiningProxy));
 
@@ -79,12 +80,18 @@ function setUp() public {
     );
     stSOLOToken = StSOLOToken(address(stSOLOProxy));
 
-    // Deploy SOLOStaking
-    stakingContract = new SOLOStaking(
+    // Deploy SOLOStaking proxy
+    bytes memory stakingInitData = abi.encodeWithSelector(
+        SOLOStaking.initialize.selector,
         address(soloToken),
         address(stSOLOToken),
         INITIAL_WITHDRAWAL_DELAY
     );
+    ERC1967Proxy stakingProxy = new ERC1967Proxy(
+        address(stakingImplementation),
+        stakingInitData
+    );
+    stakingContract = SOLOStaking(address(stakingProxy));
 
     // Set staking contract for stSOLOToken
     vm.prank(owner);
@@ -101,7 +108,7 @@ function setUp() public {
     vm.startPrank(address(gasMining));
     soloToken.approve(address(stakingContract), type(uint256).max);
     vm.stopPrank();
-}
+    }
 
     function test_UpdateAndStakeClaim() public {
         // Start at block 5

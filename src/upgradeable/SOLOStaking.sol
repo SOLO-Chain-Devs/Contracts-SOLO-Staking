@@ -1,7 +1,14 @@
+/**
+ * @title SOLO Staking Contract
+ * @author Original contract enhanced with NatSpec
+ * @notice This contract manages the staking of SOLO tokens and minting of stSOLO tokens
+ * @dev Implements staking mechanics with withdrawal delay and request management
+ */
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.16;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -9,13 +16,18 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "./StSOLOToken.sol";
 
 /**
+ * @title SOLOStaking
+ * @notice A staking contract that allows users to stake SOLO tokens and receive stSOLO tokens
+ * @dev Inherits from Ownable and ReentrancyGuard for secure management of staking operations
+ */
+/**
  * @title Upgradeable SOLOStaking
  * @notice A staking contract that allows users to stake SOLO tokens and receive stSOLO tokens
  * @dev Inherits from OwnableUpgradeable, UUPSUpgradeable, and ReentrancyGuardUpgradeable
  */
 contract SOLOStaking is Initializable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     // State variables
-    IERC20Upgradeable public soloToken;
+    IERC20 public soloToken;
     StSOLOToken public stSOLOToken;
     uint256 public withdrawalDelay;
 
@@ -54,7 +66,7 @@ contract SOLOStaking is Initializable, OwnableUpgradeable, UUPSUpgradeable, Reen
         address _stSOLOToken,
         uint256 _initialWithdrawalDelay
     ) public initializer {
-        __Ownable_init();
+        __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
 
@@ -64,7 +76,7 @@ contract SOLOStaking is Initializable, OwnableUpgradeable, UUPSUpgradeable, Reen
             "Invalid delay"
         );
 
-        soloToken = IERC20Upgradeable(_soloToken);
+        soloToken = IERC20(_soloToken);
         stSOLOToken = StSOLOToken(_stSOLOToken);
         withdrawalDelay = _initialWithdrawalDelay;
     }
@@ -232,10 +244,6 @@ contract SOLOStaking is Initializable, OwnableUpgradeable, UUPSUpgradeable, Reen
         require(success, "Token transfer failed");
     }
 
-    /**
-     * @notice Authorizes upgrades to the contract
-     * @param newImplementation Address of the new implementation
-     */
+     /// @dev Required by the OZ UUPS module
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
-
 }
