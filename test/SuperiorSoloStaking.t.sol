@@ -1,23 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "forge-std/StdUtils.sol";
 import "forge-std/Test.sol";
-import "../src/SOLOStaking.sol";
-import "../src/StSOLOToken.sol";
+import "../src/upgradeable/SOLOStaking.sol";
+import "../src/upgradeable/StSOLOToken.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "../src/upgradeable/lib/SOLOToken.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-/**
- * @title Mock SOLO Token for Advanced Testing
- * @notice Enhanced ERC20 mock implementation supporting complex staking scenarios
- * @dev Provides sufficient initial supply and precision for comprehensive share-based testing
- *      Initial supply of 1M tokens allows for diverse test scenarios while maintaining reasonable numbers
- */
-contract MockSOLO is ERC20 {
-    constructor() ERC20("SOLO Token", "SOLO") {
-        _mint(msg.sender, 1000000 * 10**decimals());
-    }
-}
+
 
 /**
  * @title Superior SOLO Staking Test Suite
@@ -31,7 +22,7 @@ contract MockSOLO is ERC20 {
 contract SuperiorSOLOStakingTest is Test {
     SOLOStaking public stakingContract;
     StSOLOToken public stSOLOToken;
-    MockSOLO public soloToken;
+    SOLOToken public soloToken;
 
     // Test participants with distinct roles
     address public owner;
@@ -53,31 +44,64 @@ contract SuperiorSOLOStakingTest is Test {
      *      4. Staking contract configuration and linking
      */
     function setUp() public {
-        owner = address(this);
-        alice = makeAddr("alice");
-        bob = makeAddr("bob");
-        charlie = makeAddr("charlie");
+    owner = address(this);
+    alice = makeAddr("alice");
+    bob = makeAddr("bob");
+    charlie = makeAddr("charlie");
 
-        // Foundry fuzzing optimization
-        vm.setEnv("FOUNDRY_FUZZ_MAX_LOCAL_REJECTS", "1000");
-        vm.setEnv("FOUNDRY_FUZZ_MAX_GLOBAL_REJECTS", "10000");
-        vm.setEnv("FOUNDRY_PROPTEST_MAX_SHRINK_ITERS", "100");
+    // Foundry fuzzing optimization
+    vm.setEnv("FOUNDRY_FUZZ_MAX_LOCAL_REJECTS", "1000");
+    vm.setEnv("FOUNDRY_FUZZ_MAX_GLOBAL_REJECTS", "10000");
+    vm.setEnv("FOUNDRY_PROPTEST_MAX_SHRINK_ITERS", "100");
 
-        // Contract deployment and configuration
-        soloToken = new MockSOLO();
-        stSOLOToken = new StSOLOToken(INITIAL_TOKENS_PER_YEAR_RATE);
-        stakingContract = new SOLOStaking(
-            address(soloToken),
-            address(stSOLOToken),
-            INITIAL_WITHDRAWAL_DELAY
-        );
+    // Deploy implementations
+    SOLOToken soloTokenImplementation = new SOLOToken();
+    StSOLOToken stSOLOImplementation = new StSOLOToken();
+    SOLOStaking stakingImplementation = new SOLOStaking();
 
-        stSOLOToken.setStakingContract(address(stakingContract));
+    // Deploy SOLO token proxy
+    bytes memory soloInitData = abi.encodeWithSelector(
+        SOLOToken.initialize.selector
+    );
+    ERC1967Proxy soloProxy = new ERC1967Proxy(
+        address(soloTokenImplementation),
+        soloInitData
+    );
+    soloToken = SOLOToken(address(soloProxy));
 
-        // Initial token distribution
-        soloToken.transfer(alice, INITIAL_AMOUNT);
-        soloToken.transfer(bob, INITIAL_AMOUNT);
-        soloToken.transfer(charlie, INITIAL_AMOUNT);
+    // Deploy StSOLO token proxy
+    bytes memory stSOLOInitData = abi.encodeWithSelector(
+        StSOLOToken.initialize.selector,
+        INITIAL_TOKENS_PER_YEAR_RATE
+    );
+    ERC1967Proxy stSOLOProxy = new ERC1967Proxy(
+        address(stSOLOImplementation),
+        stSOLOInitData
+    );
+    stSOLOToken = StSOLOToken(address(stSOLOProxy));
+
+    // Deploy SOLOStaking proxy
+    bytes memory stakingInitData = abi.encodeWithSelector(
+        SOLOStaking.initialize.selector,
+        address(soloToken),
+        address(stSOLOToken),
+        INITIAL_WITHDRAWAL_DELAY
+    );
+    ERC1967Proxy stakingProxy = new ERC1967Proxy(
+        address(stakingImplementation),
+        stakingInitData
+    );
+    stakingContract = SOLOStaking(address(stakingProxy));
+
+    // Set staking contract for StSOLO token
+    vm.prank(owner);
+    stSOLOToken.setStakingContract(address(stakingContract));
+
+    // Initial token distribution
+    soloToken.mintTo(owner, 1_000_000 ether); // Ensure sufficient tokens
+    soloToken.transfer(alice, INITIAL_AMOUNT);
+    soloToken.transfer(bob, INITIAL_AMOUNT);
+    soloToken.transfer(charlie, INITIAL_AMOUNT);
     }
 
     /**

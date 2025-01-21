@@ -2,15 +2,13 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "../src/SOLOStaking.sol";
-import "../src/StSOLOToken.sol";
+import "../src/upgradeable/SOLOStaking.sol";
+import "../src/upgradeable/StSOLOToken.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "../src/upgradeable/lib/SOLOToken.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-contract MockSOLO is ERC20 {
-    constructor() ERC20("SOLO Token", "SOLO") {
-        _mint(msg.sender, 1000000 * 10 ** decimals());
-    }
-}
+
 
 /**
  * @title Basic StSOLO Test Contract
@@ -21,7 +19,7 @@ contract BasicStSOLO is Test {
     // Contract instances
     SOLOStaking public stakingContract;
     StSOLOToken public stSOLOToken;
-    MockSOLO public soloToken;
+    SOLOToken public soloToken;
 
     // Test accounts
     address public owner;
@@ -41,35 +39,69 @@ contract BasicStSOLO is Test {
     uint256 public largeStakeAmount;
 
     function setUp() public {
-        // Initialize accounts
-        owner = address(this);
-        alice = makeAddr("alice");
-        bob = makeAddr("bob");
-        charlie = makeAddr("charlie");
-        david = makeAddr("david");
-        // Set configurable parameters
-        withdrawalDelay = 7 days;
-        baseStakeAmount = 100 ether;
-        largeStakeAmount = 500 ether;
+    // Initialize accounts
+    owner = address(this);
+    alice = makeAddr("alice");
+    bob = makeAddr("bob");
+    charlie = makeAddr("charlie");
+    david = makeAddr("david");
 
-        // Deploy contracts
-        soloToken = new MockSOLO();
-        stSOLOToken = new StSOLOToken(INITIAL_TOKENS_PER_YEAR_RATE);
-        stakingContract = new SOLOStaking(
-            address(soloToken),
-            address(stSOLOToken),
-            withdrawalDelay
-        );
+    // Set configurable parameters
+    withdrawalDelay = 7 days;
+    baseStakeAmount = 100 ether;
+    largeStakeAmount = 500 ether;
 
-        stSOLOToken.setStakingContract(address(stakingContract));
+    // Deploy implementations
+    SOLOToken soloTokenImplementation = new SOLOToken();
+    StSOLOToken stSOLOImplementation = new StSOLOToken();
+    SOLOStaking stakingImplementation = new SOLOStaking();
 
-        // Initial token distribution
-        soloToken.transfer(address(stakingContract), REWARD_COVERAGE_AMOUNT);
-        soloToken.transfer(alice, INITIAL_AMOUNT);
-        soloToken.transfer(bob, INITIAL_AMOUNT);
-        soloToken.transfer(charlie, INITIAL_AMOUNT);
-        soloToken.transfer(david, INITIAL_AMOUNT);
-    }
+    // Deploy SOLO token proxy
+    bytes memory soloInitData = abi.encodeWithSelector(
+        SOLOToken.initialize.selector
+    );
+    ERC1967Proxy soloProxy = new ERC1967Proxy(
+        address(soloTokenImplementation),
+        soloInitData
+    );
+    soloToken = SOLOToken(address(soloProxy));
+
+    // Deploy StSOLO token proxy
+    bytes memory stSOLOInitData = abi.encodeWithSelector(
+        StSOLOToken.initialize.selector,
+        INITIAL_TOKENS_PER_YEAR_RATE
+    );
+    ERC1967Proxy stSOLOProxy = new ERC1967Proxy(
+        address(stSOLOImplementation),
+        stSOLOInitData
+    );
+    stSOLOToken = StSOLOToken(address(stSOLOProxy));
+
+    // Deploy SOLOStaking proxy
+    bytes memory stakingInitData = abi.encodeWithSelector(
+        SOLOStaking.initialize.selector,
+        address(soloToken),
+        address(stSOLOToken),
+        withdrawalDelay
+    );
+    ERC1967Proxy stakingProxy = new ERC1967Proxy(
+        address(stakingImplementation),
+        stakingInitData
+    );
+    stakingContract = SOLOStaking(address(stakingProxy));
+
+    // Set staking contract for StSOLO token
+    vm.prank(owner);
+    stSOLOToken.setStakingContract(address(stakingContract));
+
+    // Initial token distribution
+    soloToken.mintTo(owner, 1_000_000 ether); // Ensure sufficient tokens
+    soloToken.mintTo(address(stakingContract), REWARD_COVERAGE_AMOUNT);
+    soloToken.transfer(alice, INITIAL_AMOUNT);
+    soloToken.transfer(bob, INITIAL_AMOUNT);
+    soloToken.transfer(charlie, INITIAL_AMOUNT);
+    soloToken.transfer(david, INITIAL_AMOUNT);
+}
 
     /**
      * @notice Tests if a user receives correct APY after one year
@@ -239,18 +271,21 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // First rebase
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + 7 days );
         vm.prank(owner);
         stSOLOToken.rebase();
 
-        // Bob requests withdrawal
+         // Bob requests withdrawal
         vm.startPrank(bob);
         stSOLOToken.approve(address(stakingContract), withdrawalAmount);
         stakingContract.requestWithdrawal(withdrawalAmount);
         vm.stopPrank();
 
+        // Create state changing tx to trigger warp effect
+
+
         // Second rebase
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + 8 days );
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -275,7 +310,7 @@ contract BasicStSOLO is Test {
             bobExpectedBalance,
             PRECISION,
             "Bob's final balance incorrect"
-        );
+        ); 
     }
 
     /**
@@ -315,11 +350,11 @@ contract BasicStSOLO is Test {
         stSOLOToken.rebase();
 
         // Second rebase period
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + 8 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
-        // Second user (Bob) stakes
+         // Second user (Bob) stakes
         vm.startPrank(bob);
         soloToken.approve(address(stakingContract), secondStake);
         stakingContract.stake(secondStake, bob);
@@ -328,8 +363,8 @@ contract BasicStSOLO is Test {
         // Store Alice's balance after Bob's entry
         //uint256 aliceBalanceAfterBobEntry = stSOLOToken.balanceOf(alice);
 
-        // Third rebase period
-        vm.warp(block.timestamp + 7 days);
+       // Third rebase period
+        vm.warp(block.timestamp + 9 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -339,8 +374,8 @@ contract BasicStSOLO is Test {
         stakingContract.stake(thirdStake, charlie);
         vm.stopPrank();
 
-        // Fourth rebase period
-        vm.warp(block.timestamp + 7 days);
+         // Fourth rebase period
+        vm.warp(block.timestamp + 10 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -358,7 +393,7 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // Fifth rebase period
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + 11 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -369,9 +404,9 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // Final rebase
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + 12 days);
         vm.prank(owner);
-        stSOLOToken.rebase();
+        stSOLOToken.rebase(); 
 
         // Verify final balances and states
         uint256 aliceFinalBalance = stSOLOToken.balanceOf(alice);
@@ -401,6 +436,7 @@ contract BasicStSOLO is Test {
         uint256 totalStaked = firstStake + secondStake + thirdStake + fourthStake; 
         uint256 contractBalance = soloToken.balanceOf(address(stakingContract));
         assertGe(contractBalance, totalStaked - withdrawAmount, "Contract should have sufficient SOLO tokens");
+        
     }
 
     function test_Multiple_Unstaking_Sequences() public {
@@ -422,7 +458,7 @@ contract BasicStSOLO is Test {
         stakingContract.stake(200 ether, alice);
         vm.stopPrank();
 
-        vm.warp(block.timestamp + 7 days);
+         vm.warp(block.timestamp + 7 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -432,7 +468,7 @@ contract BasicStSOLO is Test {
         stakingContract.stake(300 ether, bob);
         vm.stopPrank();
 
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + 8 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -442,7 +478,7 @@ contract BasicStSOLO is Test {
         stakingContract.stake(150 ether, charlie);
         vm.stopPrank();
 
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + 9 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -453,7 +489,7 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // First round of withdrawals
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + 10 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -485,7 +521,7 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // Second round of withdrawals
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + 11 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -517,7 +553,7 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // Third round - withdraw all remaining
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(block.timestamp + 12 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -598,7 +634,7 @@ contract BasicStSOLO is Test {
         );
         console.log("Alice APY: %s.%s%%", aliceWholePercent, aliceDecimals);
         console.log("Bob APY: %s.%s%%", bobWholePercent, bobDecimals);
-        console.log("Charlie APY: %s.%s%%", charlieWholePercent, charlieDecimals);
+        console.log("Charlie APY: %s.%s%%", charlieWholePercent, charlieDecimals); 
         //console.log("David effective APY (basis points):", davidAPY);
     }
         function calculateAPYPercentage(
