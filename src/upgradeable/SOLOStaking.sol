@@ -1,71 +1,70 @@
-/**
- * @title SOLO Staking Contract
- * @author Original contract enhanced with NatSpec
- * @notice This contract manages the staking of SOLO tokens and minting of stSOLO tokens
- * @dev Implements staking mechanics with withdrawal delay and request management
- */
-
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.16;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "./StSOLOToken.sol";
 
 /**
- * @title SOLOStaking
+ * @title Upgradeable SOLOStaking
  * @notice A staking contract that allows users to stake SOLO tokens and receive stSOLO tokens
- * @dev Inherits from Ownable and ReentrancyGuard for secure management of staking operations
+ * @dev Inherits from OwnableUpgradeable, UUPSUpgradeable, and ReentrancyGuardUpgradeable
  */
-contract SOLOStaking is Ownable, ReentrancyGuard {
+contract SOLOStaking is Initializable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     // State variables
-    IERC20 public soloToken;
+    IERC20Upgradeable public soloToken;
     StSOLOToken public stSOLOToken;
-    
     uint256 public withdrawalDelay;
+
     uint256 public constant MIN_WITHDRAWAL_DELAY = 0 days;
     uint256 public constant MAX_WITHDRAWAL_DELAY = 30 days;
 
-    /**
-     * @notice Structure to track withdrawal requests
-     * @dev Stores information about each withdrawal request including amounts and status
-     */
     struct WithdrawalRequest {
-        uint256 soloAmount;    // Amount in SOLO tokens
-        uint256 stSOLOAmount;  // Amount in stSOLO tokens at time of request
+        uint256 soloAmount;
+        uint256 stSOLOAmount;
         uint256 requestTime;
         bool processed;
     }
 
     mapping(address => WithdrawalRequest[]) public withdrawalRequests;
 
-    // Events
     event Staked(address indexed staker, address indexed recipient, uint256 amount);
     event WithdrawalRequested(address indexed user, uint256 stSOLOAmount, uint256 soloAmount, uint256 requestId);
     event WithdrawalProcessed(address indexed user, uint256 soloAmount, uint256 requestId);
     event WithdrawalDelayUpdated(uint256 oldDelay, uint256 newDelay);
     event EmergencyWithdrawal(address indexed token, address indexed recipient, uint256 amount);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /**
-     * @notice Contract constructor
-     * @dev Initializes the contract with token addresses and withdrawal delay
+     * @notice Initializer function for the contract
+     * @dev Replaces constructor for upgradeable contracts
      * @param _soloToken Address of the SOLO token contract
      * @param _stSOLOToken Address of the stSOLO token contract
      * @param _initialWithdrawalDelay Initial delay period for withdrawals
      */
-    constructor(
+    function initialize(
         address _soloToken,
         address _stSOLOToken,
         uint256 _initialWithdrawalDelay
-    ) Ownable(msg.sender) {
+    ) public initializer {
+        __Ownable_init();
+        __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
+
         require(
             _initialWithdrawalDelay >= MIN_WITHDRAWAL_DELAY &&
             _initialWithdrawalDelay <= MAX_WITHDRAWAL_DELAY,
             "Invalid delay"
         );
-        
-        soloToken = IERC20(_soloToken);
+
+        soloToken = IERC20Upgradeable(_soloToken);
         stSOLOToken = StSOLOToken(_stSOLOToken);
         withdrawalDelay = _initialWithdrawalDelay;
     }
@@ -232,4 +231,11 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
         bool success = erc20token.transfer(recipient, amount);
         require(success, "Token transfer failed");
     }
+
+    /**
+     * @notice Authorizes upgrades to the contract
+     * @param newImplementation Address of the new implementation
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
 }
