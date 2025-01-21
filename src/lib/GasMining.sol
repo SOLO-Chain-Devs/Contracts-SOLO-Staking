@@ -1,22 +1,24 @@
 pragma solidity ^0.8.16;
 
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "forge-std/Test.sol";
-
-
+using SafeERC20 for IERC20;
 /* 
  * @title GasMining
  * @dev Contract for mining gas rewards with options for instant claims or staking
  * @notice This contract handles the distribution of SOLO tokens as rewards
  */
-contract GasMining is Ownable {
+contract GasMining is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     IERC20 public token;
     uint256 public blockReward;
     // TODO (to implement ?)
     //uint256 public runwayBlocks;
     uint256 public latestClaimableBlock;
     uint256 public epochDuration;
+    uint256 public Counter;
 
     struct UserClaim {
         uint256 lastClaimedBlock;
@@ -39,6 +41,7 @@ contract GasMining is Ownable {
     event EpochDurationUpdated(uint256 newDuration);
     event LatestClaimableBlockUpdated(uint256 newBlock);
     event AdminWithdraw(address indexed admin, uint256 amount);
+    event BurnBasisPointsUpdated(uint256 newBurnBasisPoints);
     uint256 public burnBasisPoints = 5000; // Default 50% (5000 basis points)
     uint256 public constant MAX_BURN_BASIS_POINTS = 5000; // Max 50%
 
@@ -48,17 +51,31 @@ contract GasMining is Ownable {
      * @param _blockReward Amount of tokens to reward per block
      * @param _epochDuration Duration of each epoch in blocks
      */
-    constructor(address _token, uint256 _blockReward, uint256 _epochDuration) Ownable(msg.sender) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
+        address _token,
+        uint256 _blockReward,
+        uint256 _epochDuration,
+        uint256 _latestClaimableBlock
+    ) public initializer {
+        __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
+        
         token = IERC20(_token);
         blockReward = _blockReward;
         epochDuration = _epochDuration;
+        latestClaimableBlock = _latestClaimableBlock;
+        burnBasisPoints = 5000; // Default 50%
+        
         emit BlockRewardUpdated(_blockReward);
         emit EpochDurationUpdated(_epochDuration);
     }
 
-
-
-    event BurnBasisPointsUpdated(uint256 newBurnBasisPoints);
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     // Add this function with other admin functions
     function setBurnBasisPoints(uint256 _burnBasisPoints) external onlyOwner {
@@ -189,7 +206,6 @@ contract GasMining is Ownable {
         UserClaim storage claim = userClaims[msg.sender];
         require(claim.lastClaimedBlock < latestClaimableBlock, "No new rewards to claim");
         require(claim.pendingClaimAmount > 0, "No pending rewards to claim for the user");
-       // console.log("stakeClaim amount", claim.pendingClaimAmount);
         
         uint256 reward = claim.pendingClaimAmount;
         claim.pendingClaimAmount = 0;
@@ -198,7 +214,7 @@ contract GasMining is Ownable {
         // First approve the contract to spend the tokens
         
         // Call stake function on the staking contract with msg.sender as the user
-        ISOLOStaking(_stakingContract).stake(reward,msg.sender);
+        ISOLOStaking(_stakingContract).stake(reward, msg.sender);
         
         emit RewardStaked(msg.sender, _stakingContract, reward);
 
@@ -309,9 +325,17 @@ contract GasMining is Ownable {
             unclaimedBlocks: unclaimedBlocks
         });
     }
+
+
+    function mine(uint256 _loops) public {
+        for(uint i; i < _loops; i++){
+            Counter ++;
+        }
+    }
+
+    uint256[50] private __gap; // Storage slots for proxy upgradeability
 }
 
 interface ISOLOStaking {
-    function stake(uint256 _amount,address _user) external;
+    function stake(uint256 _amount, address _recipient) external;
 }
-
