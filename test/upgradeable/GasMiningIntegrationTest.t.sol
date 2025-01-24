@@ -6,18 +6,15 @@ import "../../src/upgradeable/lib/GasMining.sol";
 import "../../src/upgradeable/SOLOStaking.sol";
 import "../../src/upgradeable/StSOLOToken.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
-contract MockSOLO is ERC20 {
-    constructor() ERC20("SOLO Token", "SOLO") {
-        _mint(msg.sender, 1000000 * 10**decimals());
-    }
-}
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import "../../src/upgradeable/lib/SOLOToken.sol";
 
 contract GasMiningIntegrationTest is Test {
     GasMining public gasMining;
+    GasMining public implementation;
     SOLOStaking public stakingContract;
     StSOLOToken public stSOLOToken;
-    MockSOLO public soloToken;
+    SOLOToken public soloToken;
 
     address public owner;
     address public alice;
@@ -33,46 +30,84 @@ contract GasMiningIntegrationTest is Test {
     event RewardStaked(address indexed user, address indexed stakingContract, uint256 amount);
     event UserClaimUpdated(address indexed user, uint256[] blocks, uint256[] amounts, uint256 totalAmount);
 
-    function setUp() public {
-        owner = address(this);
-        alice = makeAddr("alice");
-        bob = makeAddr("bob");
-        charlie = makeAddr("charlie");
+function setUp() public {
+    owner = address(this);
+    alice = makeAddr("alice");
+    bob = makeAddr("bob");
+    charlie = makeAddr("charlie");
 
-        // Start at block 1
-        vm.roll(1);
+    // Start at block 1
+    vm.roll(1);
 
-        // Deploy contracts
-        soloToken = new MockSOLO();
-        stSOLOToken = new StSOLOToken(INITIAL_TOKENS_PER_YEAR_RATE);
-        stakingContract = new SOLOStaking(
-            address(soloToken),
-            address(stSOLOToken),
-            INITIAL_WITHDRAWAL_DELAY
-        );
-        gasMining = new GasMining(
-            address(soloToken),
-            BLOCK_REWARD,
-            EPOCH_DURATION
-        );
+    // Deploy implementations
+    implementation = new GasMining();
+    SOLOToken tokenImplementation = new SOLOToken();
+    StSOLOToken stSOLOImplementation = new StSOLOToken();
+    SOLOStaking stakingImplementation = new SOLOStaking();
 
-        // Setup permissions and initial state
-        stSOLOToken.setStakingContract(address(stakingContract));
-        
-        // Fund accounts and contracts
-        soloToken.transfer(address(gasMining), INITIAL_AMOUNT * 10);
-        soloToken.transfer(alice, INITIAL_AMOUNT);
-        soloToken.transfer(bob, INITIAL_AMOUNT);
-        soloToken.transfer(charlie, INITIAL_AMOUNT);
+    // Deploy SOLO token proxy
+    bytes memory tokenInitData = abi.encodeWithSelector(
+        SOLOToken.initialize.selector
+    );
+    ERC1967Proxy tokenProxy = new ERC1967Proxy(
+        address(tokenImplementation),
+        tokenInitData
+    );
+    soloToken = SOLOToken(address(tokenProxy));
 
-        // Setup approvals for the staking flow
-        vm.startPrank(address(gasMining));
-        soloToken.approve(address(stakingContract), type(uint256).max);
-        vm.stopPrank();
+    // Deploy GasMining proxy
+    bytes memory gasMiningInitData = abi.encodeWithSelector(
+        GasMining.initialize.selector,
+        address(soloToken),
+        BLOCK_REWARD,
+        EPOCH_DURATION,
+        0
+    );
+    ERC1967Proxy gasMiningProxy = new ERC1967Proxy(
+        address(implementation),
+        gasMiningInitData
+    );
+    gasMining = GasMining(address(gasMiningProxy));
 
-        // Need the staking contract to be able to pull tokens from GasMining
-        vm.prank(owner);
-        stSOLOToken.setStakingContract(address(stakingContract));
+    // Deploy StSOLOToken proxy
+    bytes memory stSOLOInitData = abi.encodeWithSelector(
+        StSOLOToken.initialize.selector,
+        INITIAL_TOKENS_PER_YEAR_RATE
+    );
+    ERC1967Proxy stSOLOProxy = new ERC1967Proxy(
+        address(stSOLOImplementation),
+        stSOLOInitData
+    );
+    stSOLOToken = StSOLOToken(address(stSOLOProxy));
+
+    // Deploy SOLOStaking proxy
+    bytes memory stakingInitData = abi.encodeWithSelector(
+        SOLOStaking.initialize.selector,
+        address(soloToken),
+        address(stSOLOToken),
+        INITIAL_WITHDRAWAL_DELAY
+    );
+    ERC1967Proxy stakingProxy = new ERC1967Proxy(
+        address(stakingImplementation),
+        stakingInitData
+    );
+    stakingContract = SOLOStaking(address(stakingProxy));
+
+    // Set staking contract for stSOLOToken
+    vm.prank(owner);
+    stSOLOToken.setStakingContract(address(stakingContract));
+
+    // Mint tokens and fund GasMining contract
+    soloToken.mintTo(owner, 1_000_000 ether); // Ensure enough tokens exist
+    soloToken.mintTo(address(gasMining), INITIAL_AMOUNT * 100);
+    soloToken.transfer(alice, INITIAL_AMOUNT);
+    soloToken.transfer(bob, INITIAL_AMOUNT);
+    soloToken.transfer(charlie, INITIAL_AMOUNT);
+
+    // Approve tokens for staking
+    vm.startPrank(address(gasMining));
+    soloToken.approve(address(stakingContract), type(uint256).max);
+    vm.stopPrank();
     }
 
     function test_UpdateAndStakeClaim() public {

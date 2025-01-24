@@ -82,7 +82,7 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // Advance time one year
-        vm.warp(block.timestamp + SECONDS_PER_YEAR);
+        vm.warp(vm.getBlockTimestamp() + SECONDS_PER_YEAR);
         
         // Calculate expected balance using tokensPerYear
         uint256 expectedYield = stSOLOToken.tokensPerYear();
@@ -117,7 +117,7 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // Advance time
-        vm.warp(block.timestamp + SECONDS_PER_YEAR);
+        vm.warp(vm.getBlockTimestamp() + SECONDS_PER_YEAR);
         
         // Calculate expected balance using tokensPerYear
         uint256 expectedYield = stSOLOToken.tokensPerYear();
@@ -163,7 +163,7 @@ contract BasicStSOLO is Test {
         uint256 bobProportion = largeStakeAmount * 1e18 / totalStaked;
         
         // Advance time one year
-        vm.warp(block.timestamp + SECONDS_PER_YEAR);
+        vm.warp(vm.getBlockTimestamp() + SECONDS_PER_YEAR);
         
         // Calculate expected yields using tokensPerYear
         uint256 totalYield = stSOLOToken.tokensPerYear();
@@ -202,7 +202,7 @@ contract BasicStSOLO is Test {
         stakingContract.stake(baseStakeAmount, alice);
         vm.stopPrank();
 
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -239,7 +239,7 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // First rebase
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -250,7 +250,7 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // Second rebase
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -302,6 +302,7 @@ contract BasicStSOLO is Test {
         uint256 secondStake = 300 ether;
         uint256 thirdStake = 150 ether;
         uint256 fourthStake = 250 ether;
+        stSOLOToken.setRebaseInterval(1 days); 
 
         // First user (Alice) stakes
         vm.startPrank(alice);
@@ -310,12 +311,12 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // First rebase period
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
         // Second rebase period
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -329,7 +330,7 @@ contract BasicStSOLO is Test {
         //uint256 aliceBalanceAfterBobEntry = stSOLOToken.balanceOf(alice);
 
         // Third rebase period
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -340,7 +341,7 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // Fourth rebase period
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -358,18 +359,18 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // Fifth rebase period
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
         // Process Bob's withdrawal
-        vm.warp(block.timestamp + withdrawalDelay);
+        vm.warp(vm.getBlockTimestamp() + withdrawalDelay);
         vm.startPrank(bob);
         stakingContract.processWithdrawal(0);
         vm.stopPrank();
 
         // Final rebase
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -422,7 +423,7 @@ contract BasicStSOLO is Test {
         stakingContract.stake(200 ether, alice);
         vm.stopPrank();
 
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -432,7 +433,7 @@ contract BasicStSOLO is Test {
         stakingContract.stake(300 ether, bob);
         vm.stopPrank();
 
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -442,7 +443,7 @@ contract BasicStSOLO is Test {
         stakingContract.stake(150 ether, charlie);
         vm.stopPrank();
 
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -453,7 +454,7 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // First round of withdrawals
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -472,7 +473,7 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // Process first withdrawals after delay
-        vm.warp(block.timestamp + withdrawalDelay);
+        vm.warp(vm.getBlockTimestamp() + withdrawalDelay);
         
         vm.startPrank(alice);
         stakingContract.processWithdrawal(0);
@@ -485,7 +486,7 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // Second round of withdrawals
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -504,7 +505,7 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // Process second round after delay
-        vm.warp(block.timestamp + withdrawalDelay);
+        vm.warp(vm.getBlockTimestamp() + withdrawalDelay);
 
         vm.startPrank(charlie);
         stakingContract.processWithdrawal(0);
@@ -517,7 +518,7 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // Third round - withdraw all remaining
-        vm.warp(block.timestamp + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -550,7 +551,7 @@ contract BasicStSOLO is Test {
         vm.stopPrank();
 
         // Process final withdrawals
-        vm.warp(block.timestamp + withdrawalDelay);
+        vm.warp(vm.getBlockTimestamp() + withdrawalDelay);
 
         vm.startPrank(alice);
         stakingContract.processWithdrawal(1);

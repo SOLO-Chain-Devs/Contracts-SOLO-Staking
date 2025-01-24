@@ -5,17 +5,15 @@ import "forge-std/Test.sol";
 import "../../src/upgradeable/SOLOStaking.sol";
 import "../../src/upgradeable/StSOLOToken.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "../../src/upgradeable/lib/SOLOToken.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-contract MockSOLO is ERC20 {
-    constructor() ERC20("SOLO Token", "SOLO") {
-        _mint(msg.sender, 1000000 * 10**decimals());
-    }
-}
+
 
 contract SOLOStakingFailingTest is Test {
     SOLOStaking public stakingContract;
     StSOLOToken public stSOLOToken;
-    MockSOLO public soloToken;
+    SOLOToken public soloToken;
 
     address public owner;
     address public alice;
@@ -92,28 +90,65 @@ contract SOLOStakingFailingTest is Test {
     }
 
     function setUp() public {
-        owner = address(this);
-        alice = makeAddr("alice");
-        bob = makeAddr("bob");
+    owner = address(this);
+    alice = makeAddr("alice");
+    bob = makeAddr("bob");
 
-        soloToken = new MockSOLO();
-        stSOLOToken = new StSOLOToken(INITIAL_TOKENS_PER_YEAR_RATE);
-        stakingContract = new SOLOStaking(
-            address(soloToken),
-            address(stSOLOToken),
-            INITIAL_WITHDRAWAL_DELAY
-        );
+    // Deploy implementations
+    SOLOToken soloTokenImplementation = new SOLOToken();
+    StSOLOToken stSOLOImplementation = new StSOLOToken();
+    SOLOStaking stakingImplementation = new SOLOStaking();
 
-        stSOLOToken.setStakingContract(address(stakingContract));
+    // Deploy SOLO token proxy
+    bytes memory soloInitData = abi.encodeWithSelector(
+        SOLOToken.initialize.selector
+    );
+    ERC1967Proxy soloProxy = new ERC1967Proxy(
+        address(soloTokenImplementation),
+        soloInitData
+    );
+    soloToken = SOLOToken(address(soloProxy));
 
-        soloToken.transfer(alice, INITIAL_AMOUNT);
-        soloToken.transfer(bob, INITIAL_AMOUNT);
+    // Deploy StSOLO token proxy
+    bytes memory stSOLOInitData = abi.encodeWithSelector(
+        StSOLOToken.initialize.selector,
+        INITIAL_TOKENS_PER_YEAR_RATE
+    );
+    ERC1967Proxy stSOLOProxy = new ERC1967Proxy(
+        address(stSOLOImplementation),
+        stSOLOInitData
+    );
+    stSOLOToken = StSOLOToken(address(stSOLOProxy));
 
-        vm.startPrank(alice);
-        soloToken.approve(address(stakingContract), 1 ether);
-        //stakingContract.stake(1 ether, alice);
-        vm.stopPrank();
-    }
+    // Deploy SOLOStaking proxy
+    bytes memory stakingInitData = abi.encodeWithSelector(
+        SOLOStaking.initialize.selector,
+        address(soloToken),
+        address(stSOLOToken),
+        INITIAL_WITHDRAWAL_DELAY
+    );
+    ERC1967Proxy stakingProxy = new ERC1967Proxy(
+        address(stakingImplementation),
+        stakingInitData
+    );
+    stakingContract = SOLOStaking(address(stakingProxy));
+
+    // Set staking contract for StSOLO token
+    vm.prank(owner);
+    stSOLOToken.setStakingContract(address(stakingContract));
+
+    // Mint tokens and distribute to test accounts
+    soloToken.mintTo(owner, 1_000_000 ether);
+    soloToken.transfer(alice, INITIAL_AMOUNT);
+    soloToken.transfer(bob, INITIAL_AMOUNT);
+
+    // Approve staking contract for alice
+    vm.startPrank(alice);
+    soloToken.approve(address(stakingContract), 1 ether);
+    // Uncomment the line below if you want to start with a stake
+    // stakingContract.stake(1 ether, alice);
+    vm.stopPrank();
+}
 
 
     function test_Exclude_FromRebasePreExcluded() public {

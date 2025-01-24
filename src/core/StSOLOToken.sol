@@ -7,6 +7,7 @@
 
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
+import "forge-std/Test.sol";
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -208,6 +209,9 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      */
     function rebase() public nonReentrant returns (uint256) {
         require(msg.sender == stakingContract || msg.sender == owner(), "Unauthorized");
+        console.log("block.timestamp",block.timestamp);
+        console.log("lastRebaseTime",lastRebaseTime);
+        console.log("rebaseInterval",rebaseInterval);
         require(block.timestamp >= lastRebaseTime + rebaseInterval, "Too soon to rebase");
         
         uint256 excludedAmount = calculateExcludedAmount();
