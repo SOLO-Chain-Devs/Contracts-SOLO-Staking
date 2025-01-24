@@ -1,20 +1,13 @@
-/**
- * @title StSOLO Token Contract
- * @author Original contract enhanced with NatSpec
- * @notice This contract implements a staking token that supports rebasing and exclusions
- * @dev Implements ERC20 with additional share-based accounting for rebasing functionality
- */
-
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-import "forge-std/Test.sol";
+pragma solidity ^0.8.16;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
- * @title StSOLOToken
+ * @title StSOLO Token Contract
+ * @author Original contract enhanced with NatSpec
  * @notice A staked token contract that implements rebasing functionality with exclusion support
  * @dev Inherits from ERC20, Ownable, and ReentrancyGuard for core functionality
  *      Uses share-based accounting to handle rebasing correctly
@@ -60,8 +53,6 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     event Minted(address indexed account, uint256 amount, uint256 shares);
     event Burned(address indexed account, uint256 amount, uint256 shares);
     event RebaseIntervalUpdated(uint256 interval);
-    //TODO delete this
-    event Debug_BurnAttempt(address account, uint256 attemptedBurn, uint256 actualShares);
 
     /**
      * @notice Contract constructor
@@ -209,9 +200,6 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      */
     function rebase() public nonReentrant returns (uint256) {
         require(msg.sender == stakingContract || msg.sender == owner(), "Unauthorized");
-        console.log("block.timestamp",block.timestamp);
-        console.log("lastRebaseTime",lastRebaseTime);
-        console.log("rebaseInterval",rebaseInterval);
         require(block.timestamp >= lastRebaseTime + rebaseInterval, "Too soon to rebase");
         
         uint256 excludedAmount = calculateExcludedAmount();

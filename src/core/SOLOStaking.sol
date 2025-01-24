@@ -1,12 +1,5 @@
-/**
- * @title SOLO Staking Contract
- * @author Original contract enhanced with NatSpec
- * @notice This contract manages the staking of SOLO tokens and minting of stSOLO tokens
- * @dev Implements staking mechanics with withdrawal delay and request management
- */
-
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.16;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -15,6 +8,7 @@ import "./StSOLOToken.sol";
 
 /**
  * @title SOLOStaking
+ * @author Original contract enhanced with NatSpec
  * @notice A staking contract that allows users to stake SOLO tokens and receive stSOLO tokens
  * @dev Inherits from Ownable and ReentrancyGuard for secure management of staking operations
  */
@@ -118,7 +112,7 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
                 "Insufficient allowance");
 
         // Calculate corresponding SOLO amount based on current share rate
-        uint256 soloAmount = stSOLOAmount; // 1:1 for initial implementation
+        uint256 soloAmount = stSOLOAmount; 
 
         // Create withdrawal request
         uint256 requestId = withdrawalRequests[msg.sender].length;
@@ -129,11 +123,6 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
             processed: false
         }));
 
-        // Transfer and burn stSOLO tokens immediately
-        // TODO not sure if there is a use to keep SOLO in supply and only burn later
-        // Commenting this out because I was insane when I wrote this. WTF ?
-        //require(stSOLOToken.transferFrom(msg.sender, address(this), stSOLOAmount),"stSOLO transfer failed");
-        //stSOLOToken.burn(address(this), stSOLOAmount);
         stSOLOToken.burn(msg.sender, stSOLOAmount);
 
         emit WithdrawalRequested(msg.sender, stSOLOAmount, soloAmount, requestId);
