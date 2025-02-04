@@ -46,6 +46,8 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     }
 
     // Events
+    // Update this later to emit the tokenPerShare increment to calculate historical values of users
+    //event RebaseOccurred(uint256 totalSupply, uint256 rebaseAmount, uint256 excludedAmount, uint256 tokenPerShare);
     event RebaseOccurred(uint256 totalSupply, uint256 rebaseAmount, uint256 excludedAmount);
     event RewardRateUpdated(uint256 oldRate, uint256 newRate);
     event AddressExcluded(address indexed account, bool excluded);
