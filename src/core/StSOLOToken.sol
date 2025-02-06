@@ -22,12 +22,16 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     address[] public excludedAddresses;
     
     // Core state variables
+    // TODO next deployment: Might want to add a lastRebaseBlock, that we can track easily
+    //uint256 public lastRebaseBlock;
     uint256 public lastRebaseTime;
     uint256 public rewardRate; // Annual reward rate in basis points (1 = 0.01%)
     uint256 public constant SECONDS_PER_YEAR = 31536000;
     address public stakingContract;
     
     uint256 public rebaseInterval;  // Time between rebases in seconds
+    // TODO Next deployment: we might want to lower this to 10 seconds or similar
+    //uint256 public constant MIN_REBASE_INTERVAL = 10 seconds;
     uint256 public constant MIN_REBASE_INTERVAL = 1 hours;
     uint256 public constant MAX_REBASE_INTERVAL = 30 days;
     uint256 public constant MAX_TOKENS_PER_YEAR = 100_000_000_000 ether;
@@ -51,7 +55,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     event RebaseOccurred(uint256 totalSupply, uint256 rebaseAmount, uint256 excludedAmount);
     event RewardRateUpdated(uint256 oldRate, uint256 newRate);
     event AddressExcluded(address indexed account, bool excluded);
-    // TODO added these to help
+    // TODO Remove this for next deployment: added these to help, Minted and Burned
     event Minted(address indexed account, uint256 amount, uint256 shares);
     event Burned(address indexed account, uint256 amount, uint256 shares);
     event RebaseIntervalUpdated(uint256 interval);
@@ -64,6 +68,10 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     constructor(uint256 _tokensPerYear) ERC20("Staked SOLO", "stSOLO") Ownable(msg.sender) {
         tokensPerYear = _tokensPerYear;
         lastRebaseTime = block.timestamp;
+        // TODO Next deployment; implement block.number tracking as a value
+        //lastRebaseBlock = block.number;
+        // TODO Next deployment: might want to lower it 
+        //rebaseInterval = 29 minutes;
         rebaseInterval = 12 hours;
 
         // Initialize tokenPerShare at PRECISION_FACTOR for 1:1 initial ratio
@@ -209,6 +217,8 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         
         if (rebasableSupply == 0) {
             lastRebaseTime = block.timestamp;
+            // TODO Next deployment; implement block.number tracking as a value
+            //lastRebaseBlock = block.number;
             return 0;
         }
 
@@ -221,6 +231,8 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
             uint256 shareIncrement = (rebaseAmount * PRECISION_FACTOR * 2) / _totalNormalShares;
             _tokenPerShare += shareIncrement;
             lastRebaseTime = block.timestamp;
+            // TODO Next deployment; implement block.number tracking as a value
+            //lastRebaseBlock = block.number;
         }
 
         emit RebaseOccurred(totalSupply(), rebaseAmount, excludedAmount);
