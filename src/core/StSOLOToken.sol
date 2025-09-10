@@ -16,11 +16,11 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     // Share accounting
     mapping(address => uint256) private _shares;
     uint256 private _totalShares;
-    
+
     // Rebase exclusion system
     mapping(address => bool) public excludedFromRebase;
     address[] public excludedAddresses;
-    
+
     // Core state variables
     // TODO next deployment: Might want to add a lastRebaseBlock, that we can track easily
     //uint256 public lastRebaseBlock;
@@ -28,8 +28,8 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     uint256 public rewardRate; // Annual reward rate in basis points (1 = 0.01%)
     uint256 public constant SECONDS_PER_YEAR = 31536000;
     address public stakingContract;
-    
-    uint256 public rebaseInterval;  // Time between rebases in seconds
+
+    uint256 public rebaseInterval; // Time between rebases in seconds
     // TODO Next deployment: we might want to lower this to 10 seconds or similar
     //uint256 public constant MIN_REBASE_INTERVAL = 10 seconds;
     uint256 public constant MIN_REBASE_INTERVAL = 1 hours;
@@ -44,6 +44,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @notice Ensures only the staking contract can call the function
      * @dev Modifier to restrict certain functions to the staking contract
      */
+
     modifier onlyStakingContract() {
         require(msg.sender == stakingContract, "Caller is not the staking contract");
         _;
@@ -70,7 +71,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         lastRebaseTime = block.timestamp;
         // TODO Next deployment; implement block.number tracking as a value
         //lastRebaseBlock = block.number;
-        // TODO Next deployment: might want to lower it 
+        // TODO Next deployment: might want to lower it
         //rebaseInterval = 29 minutes;
         rebaseInterval = 12 hours;
 
@@ -121,7 +122,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
             excludedFromRebase[account] = false;
             _removeFromExcludedAddresses(account);
         }
-        
+
         emit AddressExcluded(account, excluded);
     }
 
@@ -182,7 +183,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @param share Number of shares to convert
      * @return Equivalent token amount
      */
-     function _shareToAmount(uint256 share) public view returns (uint256) {
+    function _shareToAmount(uint256 share) public view returns (uint256) {
         if (_totalShares == 0) return share;
         if (excludedFromRebase[msg.sender]) {
             return share;
@@ -195,7 +196,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @param amount Token amount to convert
      * @return Equivalent number of shares
      */
-     function _amountToShare(uint256 amount) public view returns (uint256) {
+    function _amountToShare(uint256 amount) public view returns (uint256) {
         if (_totalShares == 0) return amount;
         if (excludedFromRebase[msg.sender]) {
             return amount;
@@ -211,10 +212,10 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
     function rebase() public nonReentrant returns (uint256) {
         require(msg.sender == stakingContract || msg.sender == owner(), "Unauthorized");
         require(block.timestamp >= lastRebaseTime + rebaseInterval, "Too soon to rebase");
-        
+
         uint256 excludedAmount = calculateExcludedAmount();
         uint256 rebasableSupply = totalSupply() - excludedAmount;
-        
+
         if (rebasableSupply == 0) {
             lastRebaseTime = block.timestamp;
             // TODO Next deployment; implement block.number tracking as a value
@@ -225,7 +226,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         // Calculate tokens to emit based on fixed yearly rate
         uint256 timeElapsed = block.timestamp - lastRebaseTime;
         uint256 rebaseAmount = (tokensPerYear * timeElapsed) / SECONDS_PER_YEAR;
-        
+
         if (rebaseAmount > 0) {
             // Update tokenPerShare based on fixed emission
             uint256 shareIncrement = (rebaseAmount * PRECISION_FACTOR * 2) / _totalNormalShares;
@@ -258,7 +259,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         } else {
             shareAmount = _amountToShare(amount);
         }
-        
+
         if (from != address(0)) {
             require(shareAmount <= _shares[from], "Insufficient shares during update");
             _shares[from] -= shareAmount;
@@ -266,14 +267,14 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
                 _totalNormalShares -= shareAmount;
             }
         }
-        
+
         if (to != address(0)) {
             _shares[to] += shareAmount;
             if (!excludedFromRebase[to]) {
                 _totalNormalShares += shareAmount;
             }
         }
-        
+
         super._update(from, to, amount);
     }
 
@@ -292,7 +293,6 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
         _totalShares += amount;
         _mint(account, amount);
     }
-    
 
     /**
      * @notice Burns tokens
@@ -301,55 +301,54 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @param tokenAmount Amount of tokenAmount to burn
      */
     function burn(address account, uint256 tokenAmount) external onlyStakingContract nonReentrant {
-    uint256 accountShares = _shares[account];
-    uint256 accountBalance = balanceOf(account);  // This already handles excluded vs non-excluded
-    uint256 currentERC20Balance = super.balanceOf(account);  // Add this - get raw ERC20 balance
-    
-    // Calculate proportional shares to burn
-    uint256 shareAmount = (tokenAmount * PRECISION_FACTOR) / _tokenPerShare;
-    //uint256 shareAmount = (accountShares * tokenAmount) / accountBalance;
-    
-    require(shareAmount <= accountShares, "Insufficient shares");
-    require(shareAmount > 0, "Zero shares");
-    require(tokenAmount <= accountBalance, "Burn amount exceeds balance");
-    
-    if (tokenAmount > currentERC20Balance) {
-        uint256 mintRequired = tokenAmount - currentERC20Balance;
-        super._mint(account, mintRequired);  // Explicit super call. Needed because we mix ERC20 with this weird rebase architecture
-    }
+        uint256 accountShares = _shares[account];
+        uint256 accountBalance = balanceOf(account); // This already handles excluded vs non-excluded
+        uint256 currentERC20Balance = super.balanceOf(account); // Add this - get raw ERC20 balance
 
-    _shares[account] -= shareAmount;
-    _totalShares -= shareAmount;
-    if (!excludedFromRebase[account]) {
-        _totalNormalShares -= shareAmount;
-    }
-    
-    _burn(account, tokenAmount);
-    
-    emit Burned(account, tokenAmount, shareAmount);
-}
+        // Calculate proportional shares to burn
+        uint256 shareAmount = (tokenAmount * PRECISION_FACTOR) / _tokenPerShare;
+        //uint256 shareAmount = (accountShares * tokenAmount) / accountBalance;
 
+        require(shareAmount <= accountShares, "Insufficient shares");
+        require(shareAmount > 0, "Zero shares");
+        require(tokenAmount <= accountBalance, "Burn amount exceeds balance");
 
-    /**
-    * @notice Burns tokens
-        * @dev Can only be called by staking contract
-        * @param account Address to burn tokens from
-        * @param amount Amount of tokens to burn
-        function burn(address account, uint256 amount) external onlyStakingContract nonReentrant {
-        emit Debug_BurnAttempt(account, amount, _shares[account]);
-        uint256 shareAmount = _amountToShare(amount);
-        require(shareAmount <= _shares[account], "Insufficient shares");
+        if (tokenAmount > currentERC20Balance) {
+            uint256 mintRequired = tokenAmount - currentERC20Balance;
+            super._mint(account, mintRequired); // Explicit super call. Needed because we mix ERC20 with this weird rebase architecture
+        }
 
         _shares[account] -= shareAmount;
         _totalShares -= shareAmount;
-        _burn(account, amount);
+        if (!excludedFromRebase[account]) {
+            _totalNormalShares -= shareAmount;
+        }
 
-        emit Burned(account, amount, shareAmount);
+        _burn(account, tokenAmount);
+
+        emit Burned(account, tokenAmount, shareAmount);
     }
-        */
 
-        /**
-         * @notice Returns token balance of an account
+    /**
+     * @notice Burns tokens
+     * @dev Can only be called by staking contract
+     * @param account Address to burn tokens from
+     * @param amount Amount of tokens to burn
+     *     function burn(address account, uint256 amount) external onlyStakingContract nonReentrant {
+     *     emit Debug_BurnAttempt(account, amount, _shares[account]);
+     *     uint256 shareAmount = _amountToShare(amount);
+     *     require(shareAmount <= _shares[account], "Insufficient shares");
+     *
+     *     _shares[account] -= shareAmount;
+     *     _totalShares -= shareAmount;
+     *     _burn(account, amount);
+     *
+     *     emit Burned(account, amount, shareAmount);
+     * }
+     */
+
+    /**
+     * @notice Returns token balance of an account
      * @dev Override of ERC20 balanceOf to use share-based accounting
      * @param account Address to check balance for
      * @return Token balance of the account
@@ -368,7 +367,7 @@ contract StSOLOToken is ERC20, Ownable, ReentrancyGuard {
      * @param _newTokensPerYear New annual reward rate in basis points
      */
     function setRewardTokensPerYear(uint256 _newTokensPerYear) external onlyOwner {
-        require(_newTokensPerYear <= MAX_TOKENS_PER_YEAR, "TokensPerYear inflation exceeds max"); 
+        require(_newTokensPerYear <= MAX_TOKENS_PER_YEAR, "TokensPerYear inflation exceeds max");
         rebase();
         tokensPerYear = _newTokensPerYear;
         emit RewardRateUpdated(tokensPerYear, _newTokensPerYear);

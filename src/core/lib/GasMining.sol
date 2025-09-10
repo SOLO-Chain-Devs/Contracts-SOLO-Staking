@@ -4,7 +4,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "forge-std/Test.sol";
 
-
 /* 
  * @title GasMining
  * @dev Contract for mining gas rewards with options for instant claims or staking
@@ -30,7 +29,7 @@ contract GasMining is Ownable {
 
     event InstantRewardClaimed(address indexed user, uint256 burnAmount, uint256 userReward);
     event RewardStaked(address indexed user, address indexed stakingContract, uint256 amount);
-    // TODO 
+    // TODO
     // To implement this as an event or is it too redundant as well have a backend and we will write to the blockchain ?
     // or simply
     //  event UserClaimUpdated(address indexed user, uint256 totalAmount) ?
@@ -39,6 +38,7 @@ contract GasMining is Ownable {
     event EpochDurationUpdated(uint256 newDuration);
     event LatestClaimableBlockUpdated(uint256 newBlock);
     event AdminWithdraw(address indexed admin, uint256 amount);
+
     uint256 public burnBasisPoints = 5000; // Default 50% (5000 basis points)
     uint256 public constant MAX_BURN_BASIS_POINTS = 5000; // Max 50%
 
@@ -56,8 +56,6 @@ contract GasMining is Ownable {
         emit EpochDurationUpdated(_epochDuration);
     }
 
-
-
     event BurnBasisPointsUpdated(uint256 newBurnBasisPoints);
 
     // Add this function with other admin functions
@@ -71,6 +69,7 @@ contract GasMining is Ownable {
      * @param _blockReward New reward amount per block
      * @notice Only callable by contract owner
      */
+
     function setBlockReward(uint256 _blockReward) external onlyOwner {
         blockReward = _blockReward;
         emit BlockRewardUpdated(_blockReward);
@@ -92,7 +91,9 @@ contract GasMining is Ownable {
      * @notice Only callable by contract owner
      */
     function updateLatestClaimableBlock(uint256 _block) external onlyOwner {
-        require(_block > latestClaimableBlock, "New block number must be greater than the current latest claimable block");
+        require(
+            _block > latestClaimableBlock, "New block number must be greater than the current latest claimable block"
+        );
         latestClaimableBlock = _block;
         emit LatestClaimableBlockUpdated(_block);
     }
@@ -139,7 +140,7 @@ contract GasMining is Ownable {
     function updateUserClaim(address _user, uint256[] memory _blocks, uint256[] memory _amounts) external onlyOwner {
         require(_blocks.length == _amounts.length, "Blocks and amounts arrays must have the same length");
         UserClaim storage claim = userClaims[_user];
-        
+
         uint256 totalNewAmount = 0;
         for (uint256 i = 0; i < _blocks.length; i++) {
             uint256 blockID = _blocks[i];
@@ -154,7 +155,6 @@ contract GasMining is Ownable {
 
         claim.totalClaimAmount += claim.pendingClaimAmount;
         emit UserClaimUpdated(_user, _blocks, _amounts, totalNewAmount);
-
     }
 
     /* 
@@ -165,14 +165,14 @@ contract GasMining is Ownable {
         UserClaim storage claim = userClaims[msg.sender];
         require(claim.lastClaimedBlock < latestClaimableBlock, "No new rewards to claim");
         require(claim.pendingClaimAmount > 0, "No pending rewards to claim for the user");
-        
+
         uint256 totalReward = claim.pendingClaimAmount;
         uint256 burnAmount = totalReward / 2;
         uint256 userReward = totalReward - burnAmount;
-        
+
         claim.pendingClaimAmount = 0;
         claim.lastClaimedBlock = latestClaimableBlock;
-        
+
         // Burn 50% by sending to dead address
         token.transfer(address(0xdead), burnAmount);
         // Send 50% to user
@@ -189,19 +189,18 @@ contract GasMining is Ownable {
         UserClaim storage claim = userClaims[msg.sender];
         require(claim.lastClaimedBlock < latestClaimableBlock, "No new rewards to claim");
         require(claim.pendingClaimAmount > 0, "No pending rewards to claim for the user");
-       // console.log("stakeClaim amount", claim.pendingClaimAmount);
-        
+        // console.log("stakeClaim amount", claim.pendingClaimAmount);
+
         uint256 reward = claim.pendingClaimAmount;
         claim.pendingClaimAmount = 0;
         claim.lastClaimedBlock = latestClaimableBlock;
-        
-        // First approve the contract to spend the tokens
-        
-        // Call stake function on the staking contract with msg.sender as the user
-        ISOLOStaking(_stakingContract).stake(reward,msg.sender);
-        
-        emit RewardStaked(msg.sender, _stakingContract, reward);
 
+        // First approve the contract to spend the tokens
+
+        // Call stake function on the staking contract with msg.sender as the user
+        ISOLOStaking(_stakingContract).stake(reward, msg.sender);
+
+        emit RewardStaked(msg.sender, _stakingContract, reward);
     }
 
     /* 
@@ -270,6 +269,7 @@ contract GasMining is Ownable {
         UserClaim storage claim = userClaims[_user];
         return claim.claimedBlocks;
     }
+
     struct UnclaimedDetails {
         uint256 pendingAmount;
         uint256 lastClaimedBlock;
@@ -285,7 +285,7 @@ contract GasMining is Ownable {
      */
     function getUnclaimedDetails(address _user) external view returns (UnclaimedDetails memory) {
         UserClaim storage claim = userClaims[_user];
-        
+
         // Calculate missed blocks
         uint256 missedBlocks = 0;
         if (latestClaimableBlock > claim.lastClaimedBlock) {
@@ -312,6 +312,5 @@ contract GasMining is Ownable {
 }
 
 interface ISOLOStaking {
-    function stake(uint256 _amount,address _user) external;
+    function stake(uint256 _amount, address _user) external;
 }
-

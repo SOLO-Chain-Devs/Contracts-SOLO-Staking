@@ -5,7 +5,8 @@ import "forge-std/console.sol";
 import "forge-std/console2.sol";
 
 library ScriptLogger {
-    string constant private SEPARATOR = "================================================================================";
+    string private constant SEPARATOR =
+        "================================================================================";
 
     function logDeployment(
         string memory contractName,
@@ -29,14 +30,16 @@ library ScriptLogger {
             console.log(unicode"\n🚀 Initialization Parameters:");
             console.log(unicode"  • Token Address: %s", tokenAddress);
             if (blockReward > 0) {
-                console.log(unicode"  • Block Reward: %d wei (~%d.%d SOLO)", 
+                console.log(
+                    unicode"  • Block Reward: %d wei (~%d.%d SOLO)",
                     blockReward,
                     blockReward / 1e18,
                     (blockReward % 1e18) / 1e15
                 );
             }
             if (epochDuration > 0) {
-                console.log(unicode"  • Epoch Duration: %d blocks (~%d.%d hours)", 
+                console.log(
+                    unicode"  • Epoch Duration: %d blocks (~%d.%d hours)",
                     epochDuration,
                     (epochDuration * 12) / 3600,
                     ((epochDuration * 12) % 3600) * 10 / 3600
@@ -53,11 +56,7 @@ library ScriptLogger {
         console.log("export PROXY=%s\n", proxy);
     }
 
-    function logUpgrade(
-        string memory contractName,
-        address newImplementation,
-        address proxyAddress
-    ) internal pure {
+    function logUpgrade(string memory contractName, address newImplementation, address proxyAddress) internal pure {
         console.log("%s", SEPARATOR);
         console.log(unicode"🔄 %s CONTRACT UPGRADE", contractName);
         console.log("%s", SEPARATOR);

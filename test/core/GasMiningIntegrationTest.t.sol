@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract MockSOLO is ERC20 {
     constructor() ERC20("SOLO Token", "SOLO") {
-        _mint(msg.sender, 1000000 * 10**decimals());
+        _mint(msg.sender, 1000000 * 10 ** decimals());
     }
 }
 
@@ -24,10 +24,10 @@ contract GasMiningIntegrationTest is Test {
     address public bob;
     address public charlie;
 
-    uint256 public constant INITIAL_AMOUNT = 1000 * 10**18;
-    uint256 public constant BLOCK_REWARD = 10 * 10**18; // 10 tokens per block
+    uint256 public constant INITIAL_AMOUNT = 1000 * 10 ** 18;
+    uint256 public constant BLOCK_REWARD = 10 * 10 ** 18; // 10 tokens per block
     uint256 public constant EPOCH_DURATION = 100; // 100 blocks per epoch
-    uint256 public constant INITIAL_TOKENS_PER_YEAR_RATE = 100_000 ether; 
+    uint256 public constant INITIAL_TOKENS_PER_YEAR_RATE = 100_000 ether;
     uint256 public constant INITIAL_WITHDRAWAL_DELAY = 7 days;
 
     event RewardStaked(address indexed user, address indexed stakingContract, uint256 amount);
@@ -45,20 +45,12 @@ contract GasMiningIntegrationTest is Test {
         // Deploy contracts
         soloToken = new MockSOLO();
         stSOLOToken = new StSOLOToken(INITIAL_TOKENS_PER_YEAR_RATE);
-        stakingContract = new SOLOStaking(
-            address(soloToken),
-            address(stSOLOToken),
-            INITIAL_WITHDRAWAL_DELAY
-        );
-        gasMining = new GasMining(
-            address(soloToken),
-            BLOCK_REWARD,
-            EPOCH_DURATION
-        );
+        stakingContract = new SOLOStaking(address(soloToken), address(stSOLOToken), INITIAL_WITHDRAWAL_DELAY);
+        gasMining = new GasMining(address(soloToken), BLOCK_REWARD, EPOCH_DURATION);
 
         // Setup permissions and initial state
         stSOLOToken.setStakingContract(address(stakingContract));
-        
+
         // Fund accounts and contracts
         soloToken.transfer(address(gasMining), INITIAL_AMOUNT * 10);
         soloToken.transfer(alice, INITIAL_AMOUNT);
@@ -93,7 +85,7 @@ contract GasMiningIntegrationTest is Test {
         // Update Alice's claim data
         vm.prank(owner);
         gasMining.updateUserClaim(alice, blocks, amounts);
-        
+
         // Update latest claimable block
         vm.prank(owner);
         gasMining.updateLatestClaimableBlock(5);
@@ -142,10 +134,10 @@ contract GasMiningIntegrationTest is Test {
         // Users stake their claims
         vm.prank(alice);
         gasMining.stakeClaim(address(stakingContract));
-        
+
         vm.prank(bob);
         gasMining.stakeClaim(address(stakingContract));
-        
+
         vm.prank(charlie);
         gasMining.stakeClaim(address(stakingContract));
 
@@ -227,7 +219,7 @@ contract GasMiningIntegrationTest is Test {
     function test_RevertWhen_NoNewRewardsToStakeClaim() public {
         // Setup: We need to create a scenario where lastClaimedBlock equals latestClaimableBlock
         vm.roll(5);
-        
+
         // First, set up initial claim and claim it
         uint256[] memory blocks = new uint256[](1);
         blocks[0] = 4;
@@ -245,9 +237,10 @@ contract GasMiningIntegrationTest is Test {
 
         // Now set latest claimable to same as last claimed
         /* Cannot set the same block*/
-         /*vm.prank(owner);
+        /*vm.prank(owner);
         vm.expectRevert("New block number must be greater than the current latest claimable block");
-        gasMining.updateLatestClaimableBlock(5);  */ // This should now equal lastClaimedBlock
+        gasMining.updateLatestClaimableBlock(5);  */
+        // This should now equal lastClaimedBlock
 
         // Try to claim again - should revert with no new rewards
         vm.startPrank(alice);

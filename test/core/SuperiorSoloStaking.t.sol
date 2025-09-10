@@ -15,7 +15,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
  */
 contract MockSOLO is ERC20 {
     constructor() ERC20("SOLO Token", "SOLO") {
-        _mint(msg.sender, 1000000 * 10**decimals());
+        _mint(msg.sender, 1000000 * 10 ** decimals());
     }
 }
 
@@ -35,14 +35,14 @@ contract SuperiorSOLOStakingTest is Test {
 
     // Test participants with distinct roles
     address public owner;
-    address public alice;   // Primary staker for basic scenarios
-    address public bob;     // Used for rebase exclusion testing
+    address public alice; // Primary staker for basic scenarios
+    address public bob; // Used for rebase exclusion testing
     address public charlie; // Additional participant for multi-user scenarios
 
     // Carefully chosen test parameters
-    uint256 public constant INITIAL_AMOUNT = 10000 * 10**18;    // Substantial enough for all test cases
-    uint256 public constant INITIAL_TOKENS_PER_YEAR_RATE = 100_000 ether; 
-    uint256 public constant INITIAL_WITHDRAWAL_DELAY = 7 days;  // Standard lock period
+    uint256 public constant INITIAL_AMOUNT = 10000 * 10 ** 18; // Substantial enough for all test cases
+    uint256 public constant INITIAL_TOKENS_PER_YEAR_RATE = 100_000 ether;
+    uint256 public constant INITIAL_WITHDRAWAL_DELAY = 7 days; // Standard lock period
 
     /**
      * @notice Establishes an enhanced test environment with optimized fuzzing parameters
@@ -66,11 +66,7 @@ contract SuperiorSOLOStakingTest is Test {
         // Contract deployment and configuration
         soloToken = new MockSOLO();
         stSOLOToken = new StSOLOToken(INITIAL_TOKENS_PER_YEAR_RATE);
-        stakingContract = new SOLOStaking(
-            address(soloToken),
-            address(stSOLOToken),
-            INITIAL_WITHDRAWAL_DELAY
-        );
+        stakingContract = new SOLOStaking(address(soloToken), address(stSOLOToken), INITIAL_WITHDRAWAL_DELAY);
 
         stSOLOToken.setStakingContract(address(stakingContract));
 
@@ -89,8 +85,8 @@ contract SuperiorSOLOStakingTest is Test {
      *      4. Confirming rebase effects on balances while preserving shares
      */
     function test_StakingAndShareAccounting() public {
-        uint256 stakeAmount = 1000 * 10**18;
-        
+        uint256 stakeAmount = 1000 * 10 ** 18;
+
         // For the first stake, shares should equal the staked amount
         vm.startPrank(alice);
         soloToken.approve(address(stakingContract), stakeAmount);
@@ -118,8 +114,8 @@ contract SuperiorSOLOStakingTest is Test {
      *      3. System state updates correctly after multiple stakes
      */
     function test_MultiUserStakingWithShares() public {
-        uint256 stakeAmount = 1000 * 10**18;
-        
+        uint256 stakeAmount = 1000 * 10 ** 18;
+
         // Record initial state
         //uint256 initialSupply = stSOLOToken.totalSupply();
         //uint256 initialShares = stSOLOToken.totalShares();
@@ -131,12 +127,12 @@ contract SuperiorSOLOStakingTest is Test {
         vm.stopPrank();
 
         //uint256 aliceShares = stSOLOToken.shareOf(alice);
-        
+
         // Calculate expected shares for second user
         uint256 currentSupply = stSOLOToken.totalSupply();
         uint256 currentShares = stSOLOToken.totalShares();
         uint256 expectedBobShares = (stakeAmount * currentShares) / currentSupply;
-        
+
         // Second user stake
         vm.startPrank(bob);
         soloToken.approve(address(stakingContract), stakeAmount);
@@ -160,8 +156,8 @@ contract SuperiorSOLOStakingTest is Test {
      *      4. Continued rebase benefits for non-excluded accounts
      */
     function test_ComplexRebaseExclusion() public {
-        uint256 stakeAmount = 1000 * 10**18;
-        
+        uint256 stakeAmount = 1000 * 10 ** 18;
+
         // First stake tokens
         vm.startPrank(alice);
         soloToken.approve(address(stakingContract), stakeAmount);
@@ -172,11 +168,11 @@ contract SuperiorSOLOStakingTest is Test {
         vm.startPrank(bob);
         soloToken.approve(address(stakingContract), stakeAmount);
         stakingContract.stake(stakeAmount, bob);
-        
+
         // Important: We want to withdraw only the original staked amount
         stSOLOToken.approve(address(stakingContract), stakeAmount);
         stakingContract.requestWithdrawal(stakeAmount);
-        
+
         vm.warp(block.timestamp + INITIAL_WITHDRAWAL_DELAY);
         stakingContract.processWithdrawal(0);
         vm.stopPrank();

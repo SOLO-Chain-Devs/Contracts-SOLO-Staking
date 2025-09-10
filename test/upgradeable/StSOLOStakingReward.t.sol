@@ -8,8 +8,6 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../../src/upgradeable/lib/SOLOToken.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-
-
 /**
  * @title Basic StSOLO Test Contract
  * @notice Test contract for StSOLO staking functionality with flexible parameters
@@ -29,7 +27,7 @@ contract BasicStSOLO is Test {
     address public david;
     // Configuration constants
     uint256 public constant INITIAL_AMOUNT = 1000 * 10 ** 18;
-    uint256 public constant INITIAL_TOKENS_PER_YEAR_RATE = 100_000 ether; 
+    uint256 public constant INITIAL_TOKENS_PER_YEAR_RATE = 100_000 ether;
     uint256 public withdrawalDelay;
     uint256 public constant SECONDS_PER_YEAR = 31536000;
     uint256 public constant PRECISION = 0.001 ether; // Tolerance for approximate equality checks
@@ -39,69 +37,53 @@ contract BasicStSOLO is Test {
     uint256 public largeStakeAmount;
 
     function setUp() public {
-    // Initialize accounts
-    owner = address(this);
-    alice = makeAddr("alice");
-    bob = makeAddr("bob");
-    charlie = makeAddr("charlie");
-    david = makeAddr("david");
+        // Initialize accounts
+        owner = address(this);
+        alice = makeAddr("alice");
+        bob = makeAddr("bob");
+        charlie = makeAddr("charlie");
+        david = makeAddr("david");
 
-    // Set configurable parameters
-    withdrawalDelay = 7 days;
-    baseStakeAmount = 100 ether;
-    largeStakeAmount = 500 ether;
+        // Set configurable parameters
+        withdrawalDelay = 7 days;
+        baseStakeAmount = 100 ether;
+        largeStakeAmount = 500 ether;
 
-    // Deploy implementations
-    SOLOToken soloTokenImplementation = new SOLOToken();
-    StSOLOToken stSOLOImplementation = new StSOLOToken();
-    SOLOStaking stakingImplementation = new SOLOStaking();
+        // Deploy implementations
+        SOLOToken soloTokenImplementation = new SOLOToken();
+        StSOLOToken stSOLOImplementation = new StSOLOToken();
+        SOLOStaking stakingImplementation = new SOLOStaking();
 
-    // Deploy SOLO token proxy
-    bytes memory soloInitData = abi.encodeWithSelector(
-        SOLOToken.initialize.selector
-    );
-    ERC1967Proxy soloProxy = new ERC1967Proxy(
-        address(soloTokenImplementation),
-        soloInitData
-    );
-    soloToken = SOLOToken(address(soloProxy));
+        // Deploy SOLO token proxy
+        bytes memory soloInitData = abi.encodeWithSelector(SOLOToken.initialize.selector);
+        ERC1967Proxy soloProxy = new ERC1967Proxy(address(soloTokenImplementation), soloInitData);
+        soloToken = SOLOToken(address(soloProxy));
 
-    // Deploy StSOLO token proxy
-    bytes memory stSOLOInitData = abi.encodeWithSelector(
-        StSOLOToken.initialize.selector,
-        INITIAL_TOKENS_PER_YEAR_RATE
-    );
-    ERC1967Proxy stSOLOProxy = new ERC1967Proxy(
-        address(stSOLOImplementation),
-        stSOLOInitData
-    );
-    stSOLOToken = StSOLOToken(address(stSOLOProxy));
+        // Deploy StSOLO token proxy
+        bytes memory stSOLOInitData =
+            abi.encodeWithSelector(StSOLOToken.initialize.selector, INITIAL_TOKENS_PER_YEAR_RATE);
+        ERC1967Proxy stSOLOProxy = new ERC1967Proxy(address(stSOLOImplementation), stSOLOInitData);
+        stSOLOToken = StSOLOToken(address(stSOLOProxy));
 
-    // Deploy SOLOStaking proxy
-    bytes memory stakingInitData = abi.encodeWithSelector(
-        SOLOStaking.initialize.selector,
-        address(soloToken),
-        address(stSOLOToken),
-        withdrawalDelay
-    );
-    ERC1967Proxy stakingProxy = new ERC1967Proxy(
-        address(stakingImplementation),
-        stakingInitData
-    );
-    stakingContract = SOLOStaking(address(stakingProxy));
+        // Deploy SOLOStaking proxy
+        bytes memory stakingInitData = abi.encodeWithSelector(
+            SOLOStaking.initialize.selector, address(soloToken), address(stSOLOToken), withdrawalDelay
+        );
+        ERC1967Proxy stakingProxy = new ERC1967Proxy(address(stakingImplementation), stakingInitData);
+        stakingContract = SOLOStaking(address(stakingProxy));
 
-    // Set staking contract for StSOLO token
-    vm.prank(owner);
-    stSOLOToken.setStakingContract(address(stakingContract));
+        // Set staking contract for StSOLO token
+        vm.prank(owner);
+        stSOLOToken.setStakingContract(address(stakingContract));
 
-    // Initial token distribution
-    soloToken.mintTo(owner, 1_000_000 ether); // Ensure sufficient tokens
-    soloToken.mintTo(address(stakingContract), REWARD_COVERAGE_AMOUNT);
-    soloToken.transfer(alice, INITIAL_AMOUNT);
-    soloToken.transfer(bob, INITIAL_AMOUNT);
-    soloToken.transfer(charlie, INITIAL_AMOUNT);
-    soloToken.transfer(david, INITIAL_AMOUNT);
-}
+        // Initial token distribution
+        soloToken.mintTo(owner, 1_000_000 ether); // Ensure sufficient tokens
+        soloToken.mintTo(address(stakingContract), REWARD_COVERAGE_AMOUNT);
+        soloToken.transfer(alice, INITIAL_AMOUNT);
+        soloToken.transfer(bob, INITIAL_AMOUNT);
+        soloToken.transfer(charlie, INITIAL_AMOUNT);
+        soloToken.transfer(david, INITIAL_AMOUNT);
+    }
 
     /**
      * @notice Tests if a user receives correct APY after one year
@@ -115,7 +97,7 @@ contract BasicStSOLO is Test {
 
         // Advance time one year
         vm.warp(vm.getBlockTimestamp() + SECONDS_PER_YEAR);
-        
+
         // Calculate expected balance using tokensPerYear
         uint256 expectedYield = stSOLOToken.tokensPerYear();
         uint256 expectedBalance = baseStakeAmount + expectedYield;
@@ -124,10 +106,7 @@ contract BasicStSOLO is Test {
         stSOLOToken.rebase();
 
         vm.assertApproxEqAbs(
-            stSOLOToken.balanceOf(alice),
-            expectedBalance,
-            PRECISION,
-            "Incorrect rewards after one year"
+            stSOLOToken.balanceOf(alice), expectedBalance, PRECISION, "Incorrect rewards after one year"
         );
     }
 
@@ -150,26 +129,16 @@ contract BasicStSOLO is Test {
 
         // Advance time
         vm.warp(vm.getBlockTimestamp() + SECONDS_PER_YEAR);
-        
+
         // Calculate expected balance using tokensPerYear
         uint256 expectedYield = stSOLOToken.tokensPerYear();
         uint256 expectedBalance = baseStakeAmount + expectedYield / 2; // Divide by 2 since rewards are split between Alice and Bob
-        
+
         vm.prank(owner);
         stSOLOToken.rebase();
 
-        vm.assertApproxEqAbs(
-            stSOLOToken.balanceOf(alice),
-            expectedBalance,
-            PRECISION,
-            "Alice's balance incorrect"
-        );
-        vm.assertApproxEqAbs(
-            stSOLOToken.balanceOf(bob),
-            expectedBalance,
-            PRECISION,
-            "Bob's balance incorrect"
-        );
+        vm.assertApproxEqAbs(stSOLOToken.balanceOf(alice), expectedBalance, PRECISION, "Alice's balance incorrect");
+        vm.assertApproxEqAbs(stSOLOToken.balanceOf(bob), expectedBalance, PRECISION, "Bob's balance incorrect");
     }
 
     /**
@@ -193,15 +162,15 @@ contract BasicStSOLO is Test {
         uint256 totalStaked = baseStakeAmount + largeStakeAmount;
         uint256 aliceProportion = baseStakeAmount * 1e18 / totalStaked;
         uint256 bobProportion = largeStakeAmount * 1e18 / totalStaked;
-        
+
         // Advance time one year
         vm.warp(vm.getBlockTimestamp() + SECONDS_PER_YEAR);
-        
+
         // Calculate expected yields using tokensPerYear
         uint256 totalYield = stSOLOToken.tokensPerYear();
         uint256 aliceExpectedYield = (totalYield * aliceProportion) / 1e18;
         uint256 bobExpectedYield = (totalYield * bobProportion) / 1e18;
-        
+
         // Calculate final expected balances
         uint256 expectedSmallBalance = baseStakeAmount + aliceExpectedYield;
         uint256 expectedLargeBalance = largeStakeAmount + bobExpectedYield;
@@ -210,16 +179,10 @@ contract BasicStSOLO is Test {
         stSOLOToken.rebase();
 
         vm.assertApproxEqAbs(
-            stSOLOToken.balanceOf(alice),
-            expectedSmallBalance,
-            PRECISION,
-            "Small stake rewards incorrect"
+            stSOLOToken.balanceOf(alice), expectedSmallBalance, PRECISION, "Small stake rewards incorrect"
         );
         vm.assertApproxEqAbs(
-            stSOLOToken.balanceOf(bob),
-            expectedLargeBalance,
-            PRECISION,
-            "Large stake rewards incorrect"
+            stSOLOToken.balanceOf(bob), expectedLargeBalance, PRECISION, "Large stake rewards incorrect"
         );
     }
 
@@ -228,7 +191,6 @@ contract BasicStSOLO is Test {
      * @dev Verifies correct reward calculation for different staking entry points
      */
     function test_Staggered_Staking_Rebase() public {
-
         vm.startPrank(alice);
         soloToken.approve(address(stakingContract), baseStakeAmount);
         stakingContract.stake(baseStakeAmount, alice);
@@ -239,16 +201,10 @@ contract BasicStSOLO is Test {
         stSOLOToken.rebase();
 
         uint256 updatedTokenPerShare = stSOLOToken.getTokenPerShare();
-        uint256 aliceExpectedBalance = calculateExpectedBalance(
-            baseStakeAmount,
-            updatedTokenPerShare
-        );
+        uint256 aliceExpectedBalance = calculateExpectedBalance(baseStakeAmount, updatedTokenPerShare);
 
         vm.assertApproxEqAbs(
-            stSOLOToken.balanceOf(alice),
-            aliceExpectedBalance,
-            PRECISION,
-            "Incorrect balance after staggered staking"
+            stSOLOToken.balanceOf(alice), aliceExpectedBalance, PRECISION, "Incorrect balance after staggered staking"
         );
     }
 
@@ -275,14 +231,13 @@ contract BasicStSOLO is Test {
         vm.prank(owner);
         stSOLOToken.rebase();
 
-         // Bob requests withdrawal
+        // Bob requests withdrawal
         vm.startPrank(bob);
         stSOLOToken.approve(address(stakingContract), withdrawalAmount);
         stakingContract.requestWithdrawal(withdrawalAmount);
         vm.stopPrank();
 
         // Create state changing tx to trigger warp effect
-
 
         // Second rebase
         vm.warp(vm.getBlockTimestamp() + 8 days);
@@ -291,26 +246,15 @@ contract BasicStSOLO is Test {
 
         // Validate final balances
         uint256 tokenPerShareAfterSecondRebase = stSOLOToken.getTokenPerShare();
-        uint256 aliceExpectedBalance = calculateExpectedBalance(
-            baseStakeAmount,
-            tokenPerShareAfterSecondRebase
-        );
+        uint256 aliceExpectedBalance = calculateExpectedBalance(baseStakeAmount, tokenPerShareAfterSecondRebase);
 
         uint256 remainingSharesBob = stSOLOToken.shareOf(bob);
         uint256 bobExpectedBalance = (remainingSharesBob * tokenPerShareAfterSecondRebase) / 1e18;
 
         vm.assertApproxEqAbs(
-            stSOLOToken.balanceOf(alice),
-            aliceExpectedBalance,
-            PRECISION,
-            "Alice's final balance incorrect"
+            stSOLOToken.balanceOf(alice), aliceExpectedBalance, PRECISION, "Alice's final balance incorrect"
         );
-        vm.assertApproxEqAbs(
-            stSOLOToken.balanceOf(bob),
-            bobExpectedBalance,
-            PRECISION,
-            "Bob's final balance incorrect"
-        ); 
+        vm.assertApproxEqAbs(stSOLOToken.balanceOf(bob), bobExpectedBalance, PRECISION, "Bob's final balance incorrect");
     }
 
     /**
@@ -319,10 +263,7 @@ contract BasicStSOLO is Test {
      * @param tokenPerShare Current token per share ratio
      * @return Expected balance after applying share ratio
      */
-    function calculateExpectedBalance(
-        uint256 initialStake,
-        uint256 tokenPerShare
-    ) internal pure returns (uint256) {
+    function calculateExpectedBalance(uint256 initialStake, uint256 tokenPerShare) internal pure returns (uint256) {
         return (initialStake * tokenPerShare) / 1e18;
     }
 
@@ -354,7 +295,7 @@ contract BasicStSOLO is Test {
         vm.prank(owner);
         stSOLOToken.rebase();
 
-         // Second user (Bob) stakes
+        // Second user (Bob) stakes
         vm.startPrank(bob);
         soloToken.approve(address(stakingContract), secondStake);
         stakingContract.stake(secondStake, bob);
@@ -363,7 +304,7 @@ contract BasicStSOLO is Test {
         // Store Alice's balance after Bob's entry
         //uint256 aliceBalanceAfterBobEntry = stSOLOToken.balanceOf(alice);
 
-       // Third rebase period
+        // Third rebase period
         vm.warp(vm.getBlockTimestamp() + 9 days);
         vm.prank(owner);
         stSOLOToken.rebase();
@@ -374,7 +315,7 @@ contract BasicStSOLO is Test {
         stakingContract.stake(thirdStake, charlie);
         vm.stopPrank();
 
-         // Fourth rebase period
+        // Fourth rebase period
         vm.warp(vm.getBlockTimestamp() + 10 days);
         vm.prank(owner);
         stSOLOToken.rebase();
@@ -406,7 +347,7 @@ contract BasicStSOLO is Test {
         // Final rebase
         vm.warp(vm.getBlockTimestamp() + 12 days);
         vm.prank(owner);
-        stSOLOToken.rebase(); 
+        stSOLOToken.rebase();
 
         // Verify final balances and states
         uint256 aliceFinalBalance = stSOLOToken.balanceOf(alice);
@@ -416,7 +357,9 @@ contract BasicStSOLO is Test {
 
         // Assert that balances have increased from initial stakes
         assertGt(aliceFinalBalance, firstStake, "Alice's balance should have increased");
-        assertGt(bobFinalBalance, secondStake - withdrawAmount, "Bob's balance should have increased despite withdrawal");
+        assertGt(
+            bobFinalBalance, secondStake - withdrawAmount, "Bob's balance should have increased despite withdrawal"
+        );
         assertGt(charlieFinalBalance, thirdStake, "Charlie's balance should have increased");
         assertGt(davidFinalBalance, fourthStake, "David's balance should have increased");
 
@@ -428,15 +371,14 @@ contract BasicStSOLO is Test {
         );
 
         // Verify Bob's withdrawal was processed
-        (uint256 bobWithdrawalRequest, , , bool processed) = stakingContract.withdrawalRequests(bob, 0);
+        (uint256 bobWithdrawalRequest,,, bool processed) = stakingContract.withdrawalRequests(bob, 0);
         assertTrue(processed, "Bob's withdrawal should be processed");
         assertEq(bobWithdrawalRequest, withdrawAmount, "Withdrawal amount should match request");
 
         // Verify system state is consistent
-        uint256 totalStaked = firstStake + secondStake + thirdStake + fourthStake; 
+        uint256 totalStaked = firstStake + secondStake + thirdStake + fourthStake;
         uint256 contractBalance = soloToken.balanceOf(address(stakingContract));
         assertGe(contractBalance, totalStaked - withdrawAmount, "Contract should have sufficient SOLO tokens");
-        
     }
 
     function test_Multiple_Unstaking_Sequences() public {
@@ -458,7 +400,7 @@ contract BasicStSOLO is Test {
         stakingContract.stake(200 ether, alice);
         vm.stopPrank();
 
-         vm.warp(vm.getBlockTimestamp() + 7 days);
+        vm.warp(vm.getBlockTimestamp() + 7 days);
         vm.prank(owner);
         stSOLOToken.rebase();
 
@@ -509,7 +451,7 @@ contract BasicStSOLO is Test {
 
         // Process first withdrawals after delay
         vm.warp(vm.getBlockTimestamp() + withdrawalDelay);
-        
+
         vm.startPrank(alice);
         stakingContract.processWithdrawal(0);
         aliceTotalWithdrawn += aliceFirstWithdraw;
@@ -615,33 +557,25 @@ contract BasicStSOLO is Test {
         //console.log("David total SOLO received:", davidTotalWithdrawn);
 
         // Calculate and log APY each user effectively received
-        
+
         //uint256 davidAPY = ((davidTotalWithdrawn - 250 ether) * 10000) / (250 ether);
-        (uint256 aliceWholePercent, uint256 aliceDecimals) = calculateAPYPercentage(
-            soloToken.balanceOf(alice),
-            aliceInitialSolo,
-            200 ether
-        );
-        (uint256 bobWholePercent, uint256 bobDecimals) = calculateAPYPercentage(
-            soloToken.balanceOf(bob),
-            bobInitialSolo,
-            300 ether
-        );
-        (uint256 charlieWholePercent, uint256 charlieDecimals) = calculateAPYPercentage(
-            soloToken.balanceOf(charlie),
-            charlieInitialSolo,
-            150 ether
-        );
+        (uint256 aliceWholePercent, uint256 aliceDecimals) =
+            calculateAPYPercentage(soloToken.balanceOf(alice), aliceInitialSolo, 200 ether);
+        (uint256 bobWholePercent, uint256 bobDecimals) =
+            calculateAPYPercentage(soloToken.balanceOf(bob), bobInitialSolo, 300 ether);
+        (uint256 charlieWholePercent, uint256 charlieDecimals) =
+            calculateAPYPercentage(soloToken.balanceOf(charlie), charlieInitialSolo, 150 ether);
         console.log("Alice APY: %s.%s%%", aliceWholePercent, aliceDecimals);
         console.log("Bob APY: %s.%s%%", bobWholePercent, bobDecimals);
-        console.log("Charlie APY: %s.%s%%", charlieWholePercent, charlieDecimals); 
+        console.log("Charlie APY: %s.%s%%", charlieWholePercent, charlieDecimals);
         //console.log("David effective APY (basis points):", davidAPY);
     }
-        function calculateAPYPercentage(
-        uint256 currentBalance,
-        uint256 initialBalance,
-        uint256 stakedAmount
-    ) public pure returns (uint256, uint256) {
+
+    function calculateAPYPercentage(uint256 currentBalance, uint256 initialBalance, uint256 stakedAmount)
+        public
+        pure
+        returns (uint256, uint256)
+    {
         // Let me think about the order of operations...
 
         // First, calculate raw APY in basis points
@@ -653,10 +587,10 @@ contract BasicStSOLO is Test {
         // - decimal part (01)
 
         // Calculate whole number percentage
-        uint256 wholeNumber = (rawAPY * 100) / 10000;  // This gives us the 10 in 10.01
+        uint256 wholeNumber = (rawAPY * 100) / 10000; // This gives us the 10 in 10.01
 
         // Calculate decimal places
-        uint256 decimals = ((rawAPY * 100) / 100) % 100;  // This gives us the 01 in 10.01
+        uint256 decimals = ((rawAPY * 100) / 100) % 100; // This gives us the 01 in 10.01
 
         return (wholeNumber, decimals);
     }

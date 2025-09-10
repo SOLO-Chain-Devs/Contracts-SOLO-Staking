@@ -38,7 +38,7 @@ interface IGasMining {
     // State-Changing Functions
     function instantClaimRewards() external;
     function stakeClaim(address _stakingContract) external;
-    
+
     // Admin Functions
     function setBlockReward(uint256 _blockReward) external;
     function setEpochDuration(uint256 _epochDuration) external;

@@ -1,6 +1,7 @@
 // DummyToken.sol
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.16;
+
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -17,7 +18,7 @@ contract SOLOToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSU
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
     }
-    
+
     function mint(uint256 amount) public {
         _mint(msg.sender, amount);
     }

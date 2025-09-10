@@ -5,12 +5,14 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 using SafeERC20 for IERC20;
 /* 
  * @title GasMining
  * @dev Contract for mining gas rewards with options for instant claims or staking
  * @notice This contract handles the distribution of SOLO tokens as rewards
  */
+
 contract GasMining is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     IERC20 public token;
     uint256 public blockReward;
@@ -32,7 +34,7 @@ contract GasMining is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
     event InstantRewardClaimed(address indexed user, uint256 burnAmount, uint256 userReward);
     event RewardStaked(address indexed user, address indexed stakingContract, uint256 amount);
-    // TODO 
+    // TODO
     // To implement this as an event or is it too redundant as well have a backend and we will write to the blockchain ?
     // or simply
     //  event UserClaimUpdated(address indexed user, uint256 totalAmount) ?
@@ -42,6 +44,7 @@ contract GasMining is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     event LatestClaimableBlockUpdated(uint256 newBlock);
     event AdminWithdraw(address indexed admin, uint256 amount);
     event BurnBasisPointsUpdated(uint256 newBurnBasisPoints);
+
     uint256 public burnBasisPoints = 5000; // Default 50% (5000 basis points)
     uint256 public constant MAX_BURN_BASIS_POINTS = 5000; // Max 50%
 
@@ -56,21 +59,19 @@ contract GasMining is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         _disableInitializers();
     }
 
-    function initialize(
-        address _token,
-        uint256 _blockReward,
-        uint256 _epochDuration,
-        uint256 _latestClaimableBlock
-    ) public initializer {
+    function initialize(address _token, uint256 _blockReward, uint256 _epochDuration, uint256 _latestClaimableBlock)
+        public
+        initializer
+    {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
-        
+
         token = IERC20(_token);
         blockReward = _blockReward;
         epochDuration = _epochDuration;
         latestClaimableBlock = _latestClaimableBlock;
         burnBasisPoints = 5000; // Default 50%
-        
+
         emit BlockRewardUpdated(_blockReward);
         emit EpochDurationUpdated(_epochDuration);
     }
@@ -88,6 +89,7 @@ contract GasMining is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      * @param _blockReward New reward amount per block
      * @notice Only callable by contract owner
      */
+
     function setBlockReward(uint256 _blockReward) external onlyOwner {
         blockReward = _blockReward;
         emit BlockRewardUpdated(_blockReward);
@@ -109,7 +111,9 @@ contract GasMining is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      * @notice Only callable by contract owner
      */
     function updateLatestClaimableBlock(uint256 _block) external onlyOwner {
-        require(_block > latestClaimableBlock, "New block number must be greater than the current latest claimable block");
+        require(
+            _block > latestClaimableBlock, "New block number must be greater than the current latest claimable block"
+        );
         latestClaimableBlock = _block;
         emit LatestClaimableBlockUpdated(_block);
     }
@@ -156,7 +160,7 @@ contract GasMining is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     function updateUserClaim(address _user, uint256[] memory _blocks, uint256[] memory _amounts) external onlyOwner {
         require(_blocks.length == _amounts.length, "Blocks and amounts arrays must have the same length");
         UserClaim storage claim = userClaims[_user];
-        
+
         uint256 totalNewAmount = 0;
         for (uint256 i = 0; i < _blocks.length; i++) {
             uint256 blockID = _blocks[i];
@@ -171,7 +175,6 @@ contract GasMining is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
         claim.totalClaimAmount += claim.pendingClaimAmount;
         emit UserClaimUpdated(_user, _blocks, _amounts, totalNewAmount);
-
     }
 
     /* 
@@ -182,14 +185,14 @@ contract GasMining is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         UserClaim storage claim = userClaims[msg.sender];
         require(claim.lastClaimedBlock < latestClaimableBlock, "No new rewards to claim");
         require(claim.pendingClaimAmount > 0, "No pending rewards to claim for the user");
-        
+
         uint256 totalReward = claim.pendingClaimAmount;
         uint256 burnAmount = totalReward / 2;
         uint256 userReward = totalReward - burnAmount;
-        
+
         claim.pendingClaimAmount = 0;
         claim.lastClaimedBlock = latestClaimableBlock;
-        
+
         // Burn 50% by sending to dead address
         token.transfer(address(0xdead), burnAmount);
         // Send 50% to user
@@ -206,18 +209,17 @@ contract GasMining is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         UserClaim storage claim = userClaims[msg.sender];
         require(claim.lastClaimedBlock < latestClaimableBlock, "No new rewards to claim");
         require(claim.pendingClaimAmount > 0, "No pending rewards to claim for the user");
-        
+
         uint256 reward = claim.pendingClaimAmount;
         claim.pendingClaimAmount = 0;
         claim.lastClaimedBlock = latestClaimableBlock;
-        
+
         // First approve the contract to spend the tokens
-        
+
         // Call stake function on the staking contract with msg.sender as the user
         ISOLOStaking(_stakingContract).stake(reward, msg.sender);
-        
-        emit RewardStaked(msg.sender, _stakingContract, reward);
 
+        emit RewardStaked(msg.sender, _stakingContract, reward);
     }
 
     /* 
@@ -286,6 +288,7 @@ contract GasMining is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         UserClaim storage claim = userClaims[_user];
         return claim.claimedBlocks;
     }
+
     struct UnclaimedDetails {
         uint256 pendingAmount;
         uint256 lastClaimedBlock;
@@ -301,7 +304,7 @@ contract GasMining is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      */
     function getUnclaimedDetails(address _user) external view returns (UnclaimedDetails memory) {
         UserClaim storage claim = userClaims[_user];
-        
+
         // Calculate missed blocks
         uint256 missedBlocks = 0;
         if (latestClaimableBlock > claim.lastClaimedBlock) {
@@ -326,10 +329,9 @@ contract GasMining is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         });
     }
 
-
     function mine(uint256 _loops) public {
-        for(uint i; i < _loops; i++){
-            Counter ++;
+        for (uint256 i; i < _loops; i++) {
+            Counter++;
         }
     }
 

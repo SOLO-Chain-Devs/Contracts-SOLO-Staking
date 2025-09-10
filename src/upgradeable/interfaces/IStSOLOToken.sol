@@ -30,7 +30,7 @@ interface IStSOLOToken {
     function excludedFromRebase(address account) external view returns (bool);
     function getExcludedAddresses() external view returns (address[] memory);
     function calculateExcludedAmount() external view returns (uint256);
-    
+
     // State variables (view functions)
     function lastRebaseTime() external view returns (uint256);
     function rewardRate() external view returns (uint256);

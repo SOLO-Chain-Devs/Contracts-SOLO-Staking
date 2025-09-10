@@ -16,7 +16,7 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
     // State variables
     IERC20 public soloToken;
     StSOLOToken public stSOLOToken;
-    
+
     uint256 public withdrawalDelay;
     uint256 public constant MIN_WITHDRAWAL_DELAY = 0 days;
     uint256 public constant MAX_WITHDRAWAL_DELAY = 30 days;
@@ -26,8 +26,8 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
      * @dev Stores information about each withdrawal request including amounts and status
      */
     struct WithdrawalRequest {
-        uint256 soloAmount;    // Amount in SOLO tokens
-        uint256 stSOLOAmount;  // Amount in stSOLO tokens at time of request
+        uint256 soloAmount; // Amount in SOLO tokens
+        uint256 stSOLOAmount; // Amount in stSOLO tokens at time of request
         uint256 requestTime;
         bool processed;
     }
@@ -48,17 +48,12 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
      * @param _stSOLOToken Address of the stSOLO token contract
      * @param _initialWithdrawalDelay Initial delay period for withdrawals
      */
-    constructor(
-        address _soloToken,
-        address _stSOLOToken,
-        uint256 _initialWithdrawalDelay
-    ) Ownable(msg.sender) {
+    constructor(address _soloToken, address _stSOLOToken, uint256 _initialWithdrawalDelay) Ownable(msg.sender) {
         require(
-            _initialWithdrawalDelay >= MIN_WITHDRAWAL_DELAY &&
-            _initialWithdrawalDelay <= MAX_WITHDRAWAL_DELAY,
+            _initialWithdrawalDelay >= MIN_WITHDRAWAL_DELAY && _initialWithdrawalDelay <= MAX_WITHDRAWAL_DELAY,
             "Invalid delay"
         );
-        
+
         soloToken = IERC20(_soloToken);
         stSOLOToken = StSOLOToken(_stSOLOToken);
         withdrawalDelay = _initialWithdrawalDelay;
@@ -70,9 +65,7 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
      * @param _newDelay New delay period in seconds
      */
     function setWithdrawalDelay(uint256 _newDelay) external onlyOwner {
-        require(_newDelay >= MIN_WITHDRAWAL_DELAY && 
-                _newDelay <= MAX_WITHDRAWAL_DELAY, 
-                "Invalid delay");
+        require(_newDelay >= MIN_WITHDRAWAL_DELAY && _newDelay <= MAX_WITHDRAWAL_DELAY, "Invalid delay");
         emit WithdrawalDelayUpdated(withdrawalDelay, _newDelay);
         withdrawalDelay = _newDelay;
     }
@@ -88,14 +81,13 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
         require(_recipient != address(0), "Invalid recipient");
         // Prevent staking directly to the staking contract
         require(_recipient != address(this), "Cannot stake to contract");
-        
+
         // Transfer SOLO tokens from the staker
-        require(soloToken.transferFrom(msg.sender, address(this), _amount),
-                "SOLO transfer failed");
+        require(soloToken.transferFrom(msg.sender, address(this), _amount), "SOLO transfer failed");
 
         // Mint stSOLO tokens to the specified recipient
         stSOLOToken.mint(_recipient, _amount);
-        
+
         emit Staked(msg.sender, _recipient, _amount);
     }
 
@@ -106,22 +98,22 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
      */
     function requestWithdrawal(uint256 stSOLOAmount) external nonReentrant {
         require(stSOLOAmount > 0, "Cannot withdraw 0");
-        require(stSOLOToken.balanceOf(msg.sender) >= stSOLOAmount, 
-                "Insufficient stSOLO balance");
-        require(stSOLOToken.allowance(msg.sender, address(this)) >= stSOLOAmount,
-                "Insufficient allowance");
+        require(stSOLOToken.balanceOf(msg.sender) >= stSOLOAmount, "Insufficient stSOLO balance");
+        require(stSOLOToken.allowance(msg.sender, address(this)) >= stSOLOAmount, "Insufficient allowance");
 
         // Calculate corresponding SOLO amount based on current share rate
-        uint256 soloAmount = stSOLOAmount; 
+        uint256 soloAmount = stSOLOAmount;
 
         // Create withdrawal request
         uint256 requestId = withdrawalRequests[msg.sender].length;
-        withdrawalRequests[msg.sender].push(WithdrawalRequest({
-            soloAmount: soloAmount,
-            stSOLOAmount: stSOLOAmount,
-            requestTime: block.timestamp,
-            processed: false
-        }));
+        withdrawalRequests[msg.sender].push(
+            WithdrawalRequest({
+                soloAmount: soloAmount,
+                stSOLOAmount: stSOLOAmount,
+                requestTime: block.timestamp,
+                processed: false
+            })
+        );
 
         stSOLOToken.burn(msg.sender, stSOLOAmount);
 
@@ -134,19 +126,16 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
      * @param _requestId ID of the withdrawal request to process
      */
     function processWithdrawal(uint256 _requestId) external nonReentrant {
-        require(_requestId < withdrawalRequests[msg.sender].length, 
-                "Invalid request ID");
-        
+        require(_requestId < withdrawalRequests[msg.sender].length, "Invalid request ID");
+
         WithdrawalRequest storage request = withdrawalRequests[msg.sender][_requestId];
         require(!request.processed, "Already processed");
-        require(block.timestamp >= request.requestTime + withdrawalDelay, 
-                "Withdrawal delay not met");
+        require(block.timestamp >= request.requestTime + withdrawalDelay, "Withdrawal delay not met");
 
         request.processed = true;
-        
+
         // Transfer SOLO tokens back to user
-        require(soloToken.transfer(msg.sender, request.soloAmount),
-                "SOLO transfer failed");
+        require(soloToken.transfer(msg.sender, request.soloAmount), "SOLO transfer failed");
 
         emit WithdrawalProcessed(msg.sender, request.soloAmount, _requestId);
     }
@@ -160,15 +149,15 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
      * @return requestTimes Array of request timestamps
      * @return processed Array of processing status flags
      */
-    function getPendingWithdrawals(address _user) 
-        external 
-        view 
+    function getPendingWithdrawals(address _user)
+        external
+        view
         returns (
             uint256[] memory soloAmounts,
             uint256[] memory stSOLOAmounts,
             uint256[] memory requestTimes,
             bool[] memory processed
-        ) 
+        )
     {
         WithdrawalRequest[] storage requests = withdrawalRequests[_user];
         soloAmounts = new uint256[](requests.length);
@@ -191,11 +180,7 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
      * @notice Allows owner to withdraw SOLO tokens in case of emergency
      * @dev Implements strict access control and safety checks
      */
-    function emergencyWithdrawToken(
-        address token,
-        address recipient, 
-        uint256 amount
-    ) external nonReentrant onlyOwner {
+    function emergencyWithdrawToken(address token, address recipient, uint256 amount) external nonReentrant onlyOwner {
         // Deep security consideration - what if the soloToken address is malicious?
         require(recipient != address(0), "Invalid recipient address");
         require(amount > 0, "Amount must be greater than 0");
@@ -203,17 +188,13 @@ contract SOLOStaking is Ownable, ReentrancyGuard {
         // Let me think about the IERC20 interface...
         // We need to safely interact with the SOLO token
         IERC20 erc20token = IERC20(token);
-        
+
         // Critical check - do we have enough balance?
         uint256 contractBalance = erc20token.balanceOf(address(this));
         require(contractBalance >= amount, "Insufficient token balance");
 
         // Before executing transfer, should we emit an event for transparency?
-        emit EmergencyWithdrawal(
-            token,
-            recipient,
-            amount
-        );
+        emit EmergencyWithdrawal(token, recipient, amount);
 
         // Execute the transfer with best practices
         // Should we use transfer() or safeTransfer()?

@@ -23,14 +23,17 @@ interface ISOLOStaking {
     function requestWithdrawal(uint256 stSOLOAmount) external;
     function processWithdrawal(uint256 _requestId) external;
     function setWithdrawalDelay(uint256 _newDelay) external;
-    
+
     // View functions
-    function getPendingWithdrawals(address _user) external view returns (
-        uint256[] memory soloAmounts,
-        uint256[] memory stSOLOAmounts,
-        uint256[] memory requestTimes,
-        bool[] memory processed
-    );
+    function getPendingWithdrawals(address _user)
+        external
+        view
+        returns (
+            uint256[] memory soloAmounts,
+            uint256[] memory stSOLOAmounts,
+            uint256[] memory requestTimes,
+            bool[] memory processed
+        );
     function soloToken() external view returns (address);
     function stSOLOToken() external view returns (address);
     function withdrawalDelay() external view returns (uint256);

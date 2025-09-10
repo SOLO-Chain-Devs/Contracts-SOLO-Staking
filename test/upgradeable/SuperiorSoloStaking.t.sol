@@ -8,8 +8,6 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../../src/upgradeable/lib/SOLOToken.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-
-
 /**
  * @title Superior SOLO Staking Test Suite
  * @notice Advanced test suite focusing on complex staking mechanics and edge cases
@@ -26,14 +24,14 @@ contract SuperiorSOLOStakingTest is Test {
 
     // Test participants with distinct roles
     address public owner;
-    address public alice;   // Primary staker for basic scenarios
-    address public bob;     // Used for rebase exclusion testing
+    address public alice; // Primary staker for basic scenarios
+    address public bob; // Used for rebase exclusion testing
     address public charlie; // Additional participant for multi-user scenarios
 
     // Carefully chosen test parameters
-    uint256 public constant INITIAL_AMOUNT = 10000 * 10**18;    // Substantial enough for all test cases
-    uint256 public constant INITIAL_TOKENS_PER_YEAR_RATE = 100_000 ether; 
-    uint256 public constant INITIAL_WITHDRAWAL_DELAY = 7 days;  // Standard lock period
+    uint256 public constant INITIAL_AMOUNT = 10000 * 10 ** 18; // Substantial enough for all test cases
+    uint256 public constant INITIAL_TOKENS_PER_YEAR_RATE = 100_000 ether;
+    uint256 public constant INITIAL_WITHDRAWAL_DELAY = 7 days; // Standard lock period
 
     /**
      * @notice Establishes an enhanced test environment with optimized fuzzing parameters
@@ -44,64 +42,48 @@ contract SuperiorSOLOStakingTest is Test {
      *      4. Staking contract configuration and linking
      */
     function setUp() public {
-    owner = address(this);
-    alice = makeAddr("alice");
-    bob = makeAddr("bob");
-    charlie = makeAddr("charlie");
+        owner = address(this);
+        alice = makeAddr("alice");
+        bob = makeAddr("bob");
+        charlie = makeAddr("charlie");
 
-    // Foundry fuzzing optimization
-    vm.setEnv("FOUNDRY_FUZZ_MAX_LOCAL_REJECTS", "1000");
-    vm.setEnv("FOUNDRY_FUZZ_MAX_GLOBAL_REJECTS", "10000");
-    vm.setEnv("FOUNDRY_PROPTEST_MAX_SHRINK_ITERS", "100");
+        // Foundry fuzzing optimization
+        vm.setEnv("FOUNDRY_FUZZ_MAX_LOCAL_REJECTS", "1000");
+        vm.setEnv("FOUNDRY_FUZZ_MAX_GLOBAL_REJECTS", "10000");
+        vm.setEnv("FOUNDRY_PROPTEST_MAX_SHRINK_ITERS", "100");
 
-    // Deploy implementations
-    SOLOToken soloTokenImplementation = new SOLOToken();
-    StSOLOToken stSOLOImplementation = new StSOLOToken();
-    SOLOStaking stakingImplementation = new SOLOStaking();
+        // Deploy implementations
+        SOLOToken soloTokenImplementation = new SOLOToken();
+        StSOLOToken stSOLOImplementation = new StSOLOToken();
+        SOLOStaking stakingImplementation = new SOLOStaking();
 
-    // Deploy SOLO token proxy
-    bytes memory soloInitData = abi.encodeWithSelector(
-        SOLOToken.initialize.selector
-    );
-    ERC1967Proxy soloProxy = new ERC1967Proxy(
-        address(soloTokenImplementation),
-        soloInitData
-    );
-    soloToken = SOLOToken(address(soloProxy));
+        // Deploy SOLO token proxy
+        bytes memory soloInitData = abi.encodeWithSelector(SOLOToken.initialize.selector);
+        ERC1967Proxy soloProxy = new ERC1967Proxy(address(soloTokenImplementation), soloInitData);
+        soloToken = SOLOToken(address(soloProxy));
 
-    // Deploy StSOLO token proxy
-    bytes memory stSOLOInitData = abi.encodeWithSelector(
-        StSOLOToken.initialize.selector,
-        INITIAL_TOKENS_PER_YEAR_RATE
-    );
-    ERC1967Proxy stSOLOProxy = new ERC1967Proxy(
-        address(stSOLOImplementation),
-        stSOLOInitData
-    );
-    stSOLOToken = StSOLOToken(address(stSOLOProxy));
+        // Deploy StSOLO token proxy
+        bytes memory stSOLOInitData =
+            abi.encodeWithSelector(StSOLOToken.initialize.selector, INITIAL_TOKENS_PER_YEAR_RATE);
+        ERC1967Proxy stSOLOProxy = new ERC1967Proxy(address(stSOLOImplementation), stSOLOInitData);
+        stSOLOToken = StSOLOToken(address(stSOLOProxy));
 
-    // Deploy SOLOStaking proxy
-    bytes memory stakingInitData = abi.encodeWithSelector(
-        SOLOStaking.initialize.selector,
-        address(soloToken),
-        address(stSOLOToken),
-        INITIAL_WITHDRAWAL_DELAY
-    );
-    ERC1967Proxy stakingProxy = new ERC1967Proxy(
-        address(stakingImplementation),
-        stakingInitData
-    );
-    stakingContract = SOLOStaking(address(stakingProxy));
+        // Deploy SOLOStaking proxy
+        bytes memory stakingInitData = abi.encodeWithSelector(
+            SOLOStaking.initialize.selector, address(soloToken), address(stSOLOToken), INITIAL_WITHDRAWAL_DELAY
+        );
+        ERC1967Proxy stakingProxy = new ERC1967Proxy(address(stakingImplementation), stakingInitData);
+        stakingContract = SOLOStaking(address(stakingProxy));
 
-    // Set staking contract for StSOLO token
-    vm.prank(owner);
-    stSOLOToken.setStakingContract(address(stakingContract));
+        // Set staking contract for StSOLO token
+        vm.prank(owner);
+        stSOLOToken.setStakingContract(address(stakingContract));
 
-    // Initial token distribution
-    soloToken.mintTo(owner, 1_000_000 ether); // Ensure sufficient tokens
-    soloToken.transfer(alice, INITIAL_AMOUNT);
-    soloToken.transfer(bob, INITIAL_AMOUNT);
-    soloToken.transfer(charlie, INITIAL_AMOUNT);
+        // Initial token distribution
+        soloToken.mintTo(owner, 1_000_000 ether); // Ensure sufficient tokens
+        soloToken.transfer(alice, INITIAL_AMOUNT);
+        soloToken.transfer(bob, INITIAL_AMOUNT);
+        soloToken.transfer(charlie, INITIAL_AMOUNT);
     }
 
     /**
@@ -113,8 +95,8 @@ contract SuperiorSOLOStakingTest is Test {
      *      4. Confirming rebase effects on balances while preserving shares
      */
     function test_StakingAndShareAccounting() public {
-        uint256 stakeAmount = 1000 * 10**18;
-        
+        uint256 stakeAmount = 1000 * 10 ** 18;
+
         // For the first stake, shares should equal the staked amount
         vm.startPrank(alice);
         soloToken.approve(address(stakingContract), stakeAmount);
@@ -142,8 +124,8 @@ contract SuperiorSOLOStakingTest is Test {
      *      3. System state updates correctly after multiple stakes
      */
     function test_MultiUserStakingWithShares() public {
-        uint256 stakeAmount = 1000 * 10**18;
-        
+        uint256 stakeAmount = 1000 * 10 ** 18;
+
         // Record initial state
         //uint256 initialSupply = stSOLOToken.totalSupply();
         //uint256 initialShares = stSOLOToken.totalShares();
@@ -155,12 +137,12 @@ contract SuperiorSOLOStakingTest is Test {
         vm.stopPrank();
 
         //uint256 aliceShares = stSOLOToken.shareOf(alice);
-        
+
         // Calculate expected shares for second user
         uint256 currentSupply = stSOLOToken.totalSupply();
         uint256 currentShares = stSOLOToken.totalShares();
         uint256 expectedBobShares = (stakeAmount * currentShares) / currentSupply;
-        
+
         // Second user stake
         vm.startPrank(bob);
         soloToken.approve(address(stakingContract), stakeAmount);
@@ -184,8 +166,8 @@ contract SuperiorSOLOStakingTest is Test {
      *      4. Continued rebase benefits for non-excluded accounts
      */
     function test_ComplexRebaseExclusion() public {
-        uint256 stakeAmount = 1000 * 10**18;
-        
+        uint256 stakeAmount = 1000 * 10 ** 18;
+
         // First stake tokens
         vm.startPrank(alice);
         soloToken.approve(address(stakingContract), stakeAmount);
@@ -196,11 +178,11 @@ contract SuperiorSOLOStakingTest is Test {
         vm.startPrank(bob);
         soloToken.approve(address(stakingContract), stakeAmount);
         stakingContract.stake(stakeAmount, bob);
-        
+
         // Important: We want to withdraw only the original staked amount
         stSOLOToken.approve(address(stakingContract), stakeAmount);
         stakingContract.requestWithdrawal(stakeAmount);
-        
+
         vm.warp(block.timestamp + INITIAL_WITHDRAWAL_DELAY);
         stakingContract.processWithdrawal(0);
         vm.stopPrank();

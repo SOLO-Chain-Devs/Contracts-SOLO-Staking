@@ -8,9 +8,6 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../../src/upgradeable/lib/SOLOToken.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-
-
-
 /**
  * @title SOLO Staking Basic Test Suite
  * @notice Core test suite for validating basic staking functionality and configuration
@@ -24,8 +21,8 @@ contract SOLOStakingTest is Test {
     address public owner;
     address public alice;
     address public bob;
-    uint256 public constant INITIAL_AMOUNT = 1000 * 10**18;
-    uint256 public constant INITIAL_TOKENS_PER_YEAR_RATE = 100_000 ether; 
+    uint256 public constant INITIAL_AMOUNT = 1000 * 10 ** 18;
+    uint256 public constant INITIAL_TOKENS_PER_YEAR_RATE = 100_000 ether;
     uint256 public constant INITIAL_WITHDRAWAL_DELAY = 7 days;
 
     /**
@@ -37,63 +34,47 @@ contract SOLOStakingTest is Test {
      *      - Distributing initial tokens to test accounts
      *      - Performing initial stake to establish baseline state
      */
-function setUp() public {
-    owner = address(this);
-    alice = makeAddr("alice");
-    bob = makeAddr("bob");
+    function setUp() public {
+        owner = address(this);
+        alice = makeAddr("alice");
+        bob = makeAddr("bob");
 
-    // Deploy implementations
-    SOLOToken soloTokenImplementation = new SOLOToken();
-    StSOLOToken stSOLOImplementation = new StSOLOToken();
-    SOLOStaking stakingImplementation = new SOLOStaking();
+        // Deploy implementations
+        SOLOToken soloTokenImplementation = new SOLOToken();
+        StSOLOToken stSOLOImplementation = new StSOLOToken();
+        SOLOStaking stakingImplementation = new SOLOStaking();
 
-    // Deploy SOLO token proxy
-    bytes memory soloInitData = abi.encodeWithSelector(
-        SOLOToken.initialize.selector
-    );
-    ERC1967Proxy soloProxy = new ERC1967Proxy(
-        address(soloTokenImplementation),
-        soloInitData
-    );
-    soloToken = SOLOToken(address(soloProxy));
+        // Deploy SOLO token proxy
+        bytes memory soloInitData = abi.encodeWithSelector(SOLOToken.initialize.selector);
+        ERC1967Proxy soloProxy = new ERC1967Proxy(address(soloTokenImplementation), soloInitData);
+        soloToken = SOLOToken(address(soloProxy));
 
-    // Deploy StSOLO token proxy
-    bytes memory stSOLOInitData = abi.encodeWithSelector(
-        StSOLOToken.initialize.selector,
-        INITIAL_TOKENS_PER_YEAR_RATE
-    );
-    ERC1967Proxy stSOLOProxy = new ERC1967Proxy(
-        address(stSOLOImplementation),
-        stSOLOInitData
-    );
-    stSOLOToken = StSOLOToken(address(stSOLOProxy));
+        // Deploy StSOLO token proxy
+        bytes memory stSOLOInitData =
+            abi.encodeWithSelector(StSOLOToken.initialize.selector, INITIAL_TOKENS_PER_YEAR_RATE);
+        ERC1967Proxy stSOLOProxy = new ERC1967Proxy(address(stSOLOImplementation), stSOLOInitData);
+        stSOLOToken = StSOLOToken(address(stSOLOProxy));
 
-    // Deploy SOLOStaking proxy
-    bytes memory stakingInitData = abi.encodeWithSelector(
-        SOLOStaking.initialize.selector,
-        address(soloToken),
-        address(stSOLOToken),
-        INITIAL_WITHDRAWAL_DELAY
-    );
-    ERC1967Proxy stakingProxy = new ERC1967Proxy(
-        address(stakingImplementation),
-        stakingInitData
-    );
-    stakingContract = SOLOStaking(address(stakingProxy));
+        // Deploy SOLOStaking proxy
+        bytes memory stakingInitData = abi.encodeWithSelector(
+            SOLOStaking.initialize.selector, address(soloToken), address(stSOLOToken), INITIAL_WITHDRAWAL_DELAY
+        );
+        ERC1967Proxy stakingProxy = new ERC1967Proxy(address(stakingImplementation), stakingInitData);
+        stakingContract = SOLOStaking(address(stakingProxy));
 
-    // Set staking contract for StSOLO token
-    vm.prank(owner);
-    stSOLOToken.setStakingContract(address(stakingContract));
+        // Set staking contract for StSOLO token
+        vm.prank(owner);
+        stSOLOToken.setStakingContract(address(stakingContract));
 
-    // Fund accounts and initial stake
-    soloToken.mintTo(owner, 1_000_000 ether);
-    soloToken.transfer(alice, INITIAL_AMOUNT);
-    soloToken.transfer(bob, INITIAL_AMOUNT);
+        // Fund accounts and initial stake
+        soloToken.mintTo(owner, 1_000_000 ether);
+        soloToken.transfer(alice, INITIAL_AMOUNT);
+        soloToken.transfer(bob, INITIAL_AMOUNT);
 
-    vm.startPrank(alice);
-    soloToken.approve(address(stakingContract), 1 ether);
-    stakingContract.stake(1 ether, alice);
-    vm.stopPrank();
+        vm.startPrank(alice);
+        soloToken.approve(address(stakingContract), 1 ether);
+        stakingContract.stake(1 ether, alice);
+        vm.stopPrank();
     }
 
     /**
@@ -112,7 +93,7 @@ function setUp() public {
      * @dev Verifies that setting a reward rate above 30% APR reverts
      */
     function test_RevertWhen_SettingExcessiveRewardRate() public {
-        uint256 tooHighRate = stSOLOToken.MAX_TOKENS_PER_YEAR() + 1;  // Same value as MAX_TOKENS_PER_YEAR
+        uint256 tooHighRate = stSOLOToken.MAX_TOKENS_PER_YEAR() + 1; // Same value as MAX_TOKENS_PER_YEAR
         vm.expectRevert("TokensPerYear inflation exceeds max");
         vm.prank(owner);
         stSOLOToken.setRewardTokensPerYear(tooHighRate);
@@ -136,7 +117,7 @@ function setUp() public {
     function test_RevertWhen_StakingToZeroAddress() public {
         vm.expectRevert("Invalid recipient");
         vm.prank(alice);
-        stakingContract.stake(100 * 10**18, address(0));
+        stakingContract.stake(100 * 10 ** 18, address(0));
     }
 
     /**
@@ -154,7 +135,7 @@ function setUp() public {
      * @dev Verifies reward rate can be updated within allowed range
      */
     function test_UpdateRewardRate() public {
-        uint256 newRate = 1000; 
+        uint256 newRate = 1000;
         vm.prank(owner);
         vm.warp(block.timestamp + 1 days); // need to warp 1 day so that rebase can occur
         stSOLOToken.setRewardTokensPerYear(newRate);

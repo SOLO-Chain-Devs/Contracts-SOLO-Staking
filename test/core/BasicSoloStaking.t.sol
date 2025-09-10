@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
  */
 contract MockSOLO is ERC20 {
     constructor() ERC20("SOLO Token", "SOLO") {
-        _mint(msg.sender, 1000000 * 10**decimals());
+        _mint(msg.sender, 1000000 * 10 ** decimals());
     }
 }
 
@@ -30,8 +30,8 @@ contract SOLOStakingTest is Test {
     address public owner;
     address public alice;
     address public bob;
-    uint256 public constant INITIAL_AMOUNT = 1000 * 10**18;
-    uint256 public constant INITIAL_TOKENS_PER_YEAR_RATE = 100_000 ether; 
+    uint256 public constant INITIAL_AMOUNT = 1000 * 10 ** 18;
+    uint256 public constant INITIAL_TOKENS_PER_YEAR_RATE = 100_000 ether;
     uint256 public constant INITIAL_WITHDRAWAL_DELAY = 7 days;
 
     /**
@@ -50,11 +50,7 @@ contract SOLOStakingTest is Test {
 
         soloToken = new MockSOLO();
         stSOLOToken = new StSOLOToken(INITIAL_TOKENS_PER_YEAR_RATE);
-        stakingContract = new SOLOStaking(
-            address(soloToken),
-            address(stSOLOToken),
-            INITIAL_WITHDRAWAL_DELAY
-        );
+        stakingContract = new SOLOStaking(address(soloToken), address(stSOLOToken), INITIAL_WITHDRAWAL_DELAY);
 
         stSOLOToken.setStakingContract(address(stakingContract));
 
@@ -83,7 +79,7 @@ contract SOLOStakingTest is Test {
      * @dev Verifies that setting a reward rate above 30% APR reverts
      */
     function test_RevertWhen_SettingExcessiveRewardRate() public {
-        uint256 tooHighRate = stSOLOToken.MAX_TOKENS_PER_YEAR() + 1;  // Same value as MAX_TOKENS_PER_YEAR
+        uint256 tooHighRate = stSOLOToken.MAX_TOKENS_PER_YEAR() + 1; // Same value as MAX_TOKENS_PER_YEAR
         vm.expectRevert("TokensPerYear inflation exceeds max");
         vm.prank(owner);
         stSOLOToken.setRewardTokensPerYear(tooHighRate);
@@ -107,7 +103,7 @@ contract SOLOStakingTest is Test {
     function test_RevertWhen_StakingToZeroAddress() public {
         vm.expectRevert("Invalid recipient");
         vm.prank(alice);
-        stakingContract.stake(100 * 10**18, address(0));
+        stakingContract.stake(100 * 10 ** 18, address(0));
     }
 
     /**
@@ -125,7 +121,7 @@ contract SOLOStakingTest is Test {
      * @dev Verifies reward rate can be updated within allowed range
      */
     function test_UpdateRewardRate() public {
-        uint256 newRate = 1000; 
+        uint256 newRate = 1000;
         vm.prank(owner);
         vm.warp(block.timestamp + 1 days); // need to warp 1 day so that rebase can occur
         stSOLOToken.setRewardTokensPerYear(newRate);

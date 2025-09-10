@@ -24,39 +24,22 @@ contract DeployScriptSOLOStaking is Script {
         SOLOStaking stakingImplementation = new SOLOStaking();
 
         // Deploy SOLOToken proxy
-        bytes memory soloInitData = abi.encodeWithSelector(
-            SOLOToken.initialize.selector
-        );
-        ERC1967Proxy soloProxy = new ERC1967Proxy(
-            address(soloTokenImplementation),
-            soloInitData
-        );
+        bytes memory soloInitData = abi.encodeWithSelector(SOLOToken.initialize.selector);
+        ERC1967Proxy soloProxy = new ERC1967Proxy(address(soloTokenImplementation), soloInitData);
         SOLOToken soloToken = SOLOToken(address(soloProxy));
 
         // Deploy StSOLOToken proxy
         uint256 initialTokensPerYearRate = 100_000 ether; // Customize as needed
-        bytes memory stSOLOInitData = abi.encodeWithSelector(
-            StSOLOToken.initialize.selector,
-            initialTokensPerYearRate
-        );
-        ERC1967Proxy stSOLOProxy = new ERC1967Proxy(
-            address(stSOLOImplementation),
-            stSOLOInitData
-        );
+        bytes memory stSOLOInitData = abi.encodeWithSelector(StSOLOToken.initialize.selector, initialTokensPerYearRate);
+        ERC1967Proxy stSOLOProxy = new ERC1967Proxy(address(stSOLOImplementation), stSOLOInitData);
         StSOLOToken stSOLOToken = StSOLOToken(address(stSOLOProxy));
 
         // Deploy SOLOStaking proxy
         uint256 initialWithdrawalDelay = 7 days; // Customize as needed
         bytes memory stakingInitData = abi.encodeWithSelector(
-            SOLOStaking.initialize.selector,
-            address(soloToken),
-            address(stSOLOToken),
-            initialWithdrawalDelay
+            SOLOStaking.initialize.selector, address(soloToken), address(stSOLOToken), initialWithdrawalDelay
         );
-        ERC1967Proxy stakingProxy = new ERC1967Proxy(
-            address(stakingImplementation),
-            stakingInitData
-        );
+        ERC1967Proxy stakingProxy = new ERC1967Proxy(address(stakingImplementation), stakingInitData);
         SOLOStaking stakingContract = SOLOStaking(address(stakingProxy));
 
         // Link StSOLOToken to SOLOStaking
@@ -69,13 +52,7 @@ contract DeployScriptSOLOStaking is Script {
 
         // Log deployment details
         ScriptLogger.logDeployment(
-            "SOLO_TOKEN",
-            address(soloTokenImplementation),
-            address(soloProxy),
-            address(0),
-            0,
-            0,
-            block.number
+            "SOLO_TOKEN", address(soloTokenImplementation), address(soloProxy), address(0), 0, 0, block.number
         );
 
         ScriptLogger.logDeployment(
